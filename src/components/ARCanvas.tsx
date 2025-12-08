@@ -24,6 +24,7 @@ export default function ARCanvas({
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(true);
 
+  // Auto-hide the hint after a few seconds
   useEffect(() => {
     const timer = setTimeout(() => setShowHint(false), 4000);
     return () => clearTimeout(timer);
@@ -43,7 +44,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Top-left: Enter AR button OR 3D-only badge */}
+      {/* Top-left control: Enter AR button OR 3D-only badge */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -82,7 +83,7 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Simple instructions */}
+      {/* Simple instructions BEFORE immersive AR */}
       {showHint && (
         <div
           style={{
@@ -98,7 +99,7 @@ export default function ARCanvas({
         >
           <div
             style={{
-              maxWidth: 360,
+              maxWidth: 320,
               backgroundColor: "rgba(0,0,0,0.75)",
               color: "#fff",
               padding: "10px 16px",
@@ -114,12 +115,10 @@ export default function ARCanvas({
               {canUseWebXR ? (
                 <>
                   Tap <strong>Enter AR</strong>, then move your phone slowly and
-                  look straight ahead to see the artwork in front of you.
+                  look at your wall to see the artwork.
                 </>
               ) : (
-                <>
-                  This is a true-to-scale 3D preview of your selected size.
-                </>
+                <>Rotate and move to preview this piece in 3D.</>
               )}
             </span>
             <button
@@ -139,19 +138,15 @@ export default function ARCanvas({
         </div>
       )}
 
-      <Canvas
-        camera={{
-          // Simple preview camera: at origin, looking down -Z
-          position: [0, 0, 0],
-          fov: 50,
-        }}
-      >
-        {/* XR will override the camera only during AR */}
+      <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
+        {/* XR takes over the camera when AR is active; otherwise it's just 3D */}
         <XR store={xrStore}>
+          {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
 
+          {/* Artwork at “gallery-ish” height and distance */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -172,13 +167,12 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Fixed position in front of the camera.
-  // In AR: ~1.5m straight ahead at the same vertical level as the device.
-  // In preview: centered in the frame.
-  const position: [number, number, number] = [0, 0, -1.5];
+  // Distance kept at 1.5m, height at ~1.1m (~hung piece)
+  const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
     <mesh position={position}>
+      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
