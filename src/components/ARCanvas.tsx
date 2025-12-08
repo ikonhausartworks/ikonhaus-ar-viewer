@@ -1,6 +1,6 @@
 // src/components/ARCanvas.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
@@ -10,6 +10,7 @@ type ARCanvasProps = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
+  canUseWebXR: boolean;
 };
 
 // Single XR store shared by this AR experience
@@ -19,11 +20,18 @@ export default function ARCanvas({
   widthMeters,
   heightMeters,
   textureUrl,
+  canUseWebXR,
 }: ARCanvasProps) {
-  const [showHint, setShowHint] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+
+  // Auto-hide the hint after a few seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleEnterAR = () => {
-    setShowHint(true);
+    if (!canUseWebXR) return;
     xrStore.enterAR();
   };
 
@@ -36,27 +44,46 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Button to enter AR on supported devices */}
-      <button
-        onClick={handleEnterAR}
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 12,
-          zIndex: 10,
-          padding: "8px 16px",
-          borderRadius: 999,
-          border: "none",
-          backgroundColor: "#fff",
-          color: "#000",
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        Enter AR
-      </button>
+      {/* Top-left control: Enter AR button OR 3D-only badge */}
+      {canUseWebXR ? (
+        <button
+          onClick={handleEnterAR}
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 10,
+            padding: "8px 16px",
+            borderRadius: 999,
+            border: "none",
+            backgroundColor: "#fff",
+            color: "#000",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Enter AR
+        </button>
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 10,
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid #666",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            color: "#fff",
+            fontSize: 12,
+          }}
+        >
+          3D preview only on this device
+        </div>
+      )}
 
-      {/* Simple AR instructions overlay */}
+      {/* Simple instructions BEFORE immersive AR */}
       {showHint && (
         <div
           style={{
@@ -85,7 +112,14 @@ export default function ARCanvas({
             }}
           >
             <span>
-              Move your phone slowly, then look at your wall to see the artwork.
+              {canUseWebXR ? (
+                <>
+                  Tap <strong>Enter AR</strong>, then move your phone slowly and
+                  look at your wall to see the artwork.
+                </>
+              ) : (
+                <>Rotate and move to preview this piece in 3D.</>
+              )}
             </span>
             <button
               type="button"
@@ -105,14 +139,14 @@ export default function ARCanvas({
       )}
 
       <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
-        {/* XR takes over the camera when AR is active */}
+        {/* XR takes over the camera when AR is active; otherwise it's just 3D */}
         <XR store={xrStore}>
           {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
 
-          {/* Artwork at “gallery” height and distance */}
+          {/* Artwork at “gallery-ish” height and distance */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -133,8 +167,8 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Approx: 0.8m above camera, 1.5m in front – feels like a hung piece
-  const position: [number, number, number] = [0, 0.8, -1.5];
+  // Distance kept at 1.5m, height at ~1.1m (~hung piece)
+  const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
     <mesh position={position}>
