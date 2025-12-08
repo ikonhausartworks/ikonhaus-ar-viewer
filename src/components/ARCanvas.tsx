@@ -167,8 +167,8 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Distance kept at 1.5m, height at ~1.1m (~hung piece)
-  const position: [number, number, number] = [0, 1.1, -1.5];
+  // Raised ~0.3m (about 1 ft) and moved back ~0.15m (about 6 in)
+  const position: [number, number, number] = [0, 1.4, -1.65];
 
   return (
     <mesh position={position}>
