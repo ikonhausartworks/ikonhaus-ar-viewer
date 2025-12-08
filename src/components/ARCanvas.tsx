@@ -23,6 +23,7 @@ export default function ARCanvas({
   canUseWebXR,
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(true);
+  const [arStarted, setArStarted] = useState(false);
 
   // Auto-hide the hint after a few seconds
   useEffect(() => {
@@ -32,8 +33,12 @@ export default function ARCanvas({
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
+    setArStarted(true);
     xrStore.enterAR();
   };
+
+  const showPlaneInPreview = !canUseWebXR; // Mode C (no WebXR) gets 3D preview
+  const showPlaneInAR = canUseWebXR && arStarted; // WebXR: only show plane once AR starts
 
   return (
     <div
@@ -99,7 +104,7 @@ export default function ARCanvas({
         >
           <div
             style={{
-              maxWidth: 340,
+              maxWidth: 360,
               backgroundColor: "rgba(0,0,0,0.75)",
               color: "#fff",
               padding: "10px 16px",
@@ -114,8 +119,8 @@ export default function ARCanvas({
             <span>
               {canUseWebXR ? (
                 <>
-                  Tap <strong>Enter AR</strong>, then move your phone slowly and
-                  look at your wall to see the artwork.
+                  Tap <strong>Enter AR</strong> to view this artwork on your
+                  wall. The preview will appear once AR starts.
                 </>
               ) : (
                 <>
@@ -143,24 +148,25 @@ export default function ARCanvas({
 
       <Canvas
         camera={{
-          // Simple, robust camera: at origin, looking down -Z
+          // Neutral preview camera; AR will override this when active
           position: [0, 0, 0],
           fov: 60,
         }}
       >
-        {/* XR takes over the camera only when AR is active; otherwise it's just 3D */}
+        {/* XR takes over the camera only when AR is active */}
         <XR store={xrStore}>
           {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
 
-          {/* Artwork directly in front of the camera in preview / AR */}
-          <ArtworkPlane
-            width={widthMeters}
-            height={heightMeters}
-            textureUrl={textureUrl}
-          />
+          {(showPlaneInPreview || showPlaneInAR) && (
+            <ArtworkPlane
+              width={widthMeters}
+              height={heightMeters}
+              textureUrl={textureUrl}
+            />
+          )}
         </XR>
       </Canvas>
     </div>
@@ -176,12 +182,11 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Plane centred, 1.5m in front of the origin
-  const position: [number, number, number] = [0, 0, -1.5];
+  // AR placement: ~1.5m away, mid-wall height
+  const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
     <mesh position={position}>
-      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
