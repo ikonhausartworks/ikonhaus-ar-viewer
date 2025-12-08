@@ -10,10 +10,9 @@ type ARCanvasProps = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
-  canUseWebXR: boolean; // kept for future Mode C support
+  canUseWebXR: boolean; 
 };
 
-// Single XR store shared by this AR experience
 const xrStore = createXRStore();
 
 export default function ARCanvas({
@@ -39,7 +38,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Top-left control */}
+      {/* AR / 3D Control */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -78,7 +77,7 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Instructions overlay – only after AR is started */}
+      {/* Hint after entering AR */}
       {showHint && canUseWebXR && (
         <div
           style={{
@@ -106,10 +105,7 @@ export default function ARCanvas({
               pointerEvents: "auto",
             }}
           >
-            <span>
-              Move your phone slowly, then look at your wall to see the
-              artwork.
-            </span>
+            <span>Move your phone slowly, then look at your wall.</span>
             <button
               type="button"
               onClick={() => setShowHint(false)}
@@ -128,9 +124,7 @@ export default function ARCanvas({
       )}
 
       <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
-        {/* XR takes over the camera when AR is active */}
         <XR store={xrStore}>
-          {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
@@ -155,8 +149,10 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Same placement that felt “stuck to the wall” to you
-  const position: [number, number, number] = [0, 0.8, -1.5];
+  // New improved placement:
+  // → Higher by ~25%
+  // → Closer to the wall by ~20%
+  const position: [number, number, number] = [0, 1.0, -1.2];
 
   return (
     <mesh position={position}>
