@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { artworks, type Artwork, type ArtworkSize } from "../data/artworks";
 import { trackEvent } from "../utils/analytics";
 import ARCanvas from "../components/ARCanvas";
+import {
+  detectARCapabilities,
+  type ARCapabilities,
+} from "../utils/capabilities";
 
 export default function ARViewer() {
   const { artId } = useParams();
@@ -25,21 +29,44 @@ export default function ARViewer() {
     );
   }
 
-  // Fire a session start event once when this viewer loads
+  const [selectedSizeId, setSelectedSizeId] = useState<string>(
+    artwork.defaultSizeId
+  );
+  const [arMode, setArMode] = useState<boolean>(false);
+  const [capabilities, setCapabilities] = useState<ARCapabilities | null>(null);
+
+  const selectedSize: ArtworkSize =
+    artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
+
+  // Session start + capabilities analytics
   useEffect(() => {
     trackEvent("ar_session_start", {
       artId: artwork.id,
       title: artwork.title,
     });
+
+    const caps = detectARCapabilities();
+    setCapabilities(caps);
+
+    trackEvent("ar_capabilities_detected", {
+      artId: artwork.id,
+      isIOS: caps.isIOS,
+      isAndroid: caps.isAndroid,
+      webxrSupported: caps.webxrSupported,
+    });
   }, [artwork.id, artwork.title]);
 
-  const [selectedSizeId, setSelectedSizeId] = useState<string>(
-    artwork.defaultSizeId
-  );
-  const [arMode, setArMode] = useState<boolean>(false);
+  const webxrSupported = capabilities?.webxrSupported ?? false;
 
-  const selectedSize: ArtworkSize =
-    artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
+  const handleStartPreview = () => {
+    setArMode(true);
+    trackEvent("ar_preview_started", {
+      artId: artwork.id,
+      sizeId: selectedSize.id,
+      sizeLabel: selectedSize.label,
+      webxrSupported,
+    });
+  };
 
   return (
     <div
@@ -56,9 +83,23 @@ export default function ARViewer() {
       <h1 style={{ fontSize: "2.2rem", marginBottom: "8px" }}>
         {artwork.title}
       </h1>
-      <p style={{ marginBottom: "24px", opacity: 0.8, textAlign: "center" }}>
-        Choose a size and then view this piece on your wall in AR.
+      <p style={{ marginBottom: "16px", opacity: 0.8, textAlign: "center" }}>
+        Choose a size and then preview this piece at true scale.
       </p>
+
+      {capabilities && !webxrSupported && (
+        <p
+          style={{
+            marginBottom: "16px",
+            fontSize: "0.9rem",
+            opacity: 0.7,
+            textAlign: "center",
+          }}
+        >
+          AR view isn&apos;t available on this device yet, but you can still see
+          a true-to-scale 3D preview.
+        </p>
+      )}
 
       {/* Size selector */}
       <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
@@ -91,21 +132,21 @@ export default function ARViewer() {
         ))}
       </div>
 
-      {/* AR area */}
+      {/* AR / 3D preview entry button */}
       {!arMode && (
         <button
-          onClick={() => setArMode(true)}
+          onClick={handleStartPreview}
           style={{
             padding: "12px 24px",
             borderRadius: "12px",
             backgroundColor: "#fff",
             color: "#000",
             fontWeight: 600,
-            marginBottom: "24px",
+            marginBottom: "16px",
             cursor: "pointer",
           }}
         >
-          Start AR Preview
+          {webxrSupported ? "Start AR Preview" : "Start 3D Preview"}
         </button>
       )}
 
@@ -125,6 +166,7 @@ export default function ARViewer() {
             widthMeters={selectedSize.widthMeters}
             heightMeters={selectedSize.heightMeters}
             textureUrl={selectedSize.textureUrl}
+            canUseWebXR={webxrSupported}
           />
         </div>
       )}
