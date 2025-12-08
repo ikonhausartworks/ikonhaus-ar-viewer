@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
-import { useTexture } from "@react-three/drei";
+import { useTexture, OrbitControls } from "@react-three/drei";
 import { DoubleSide } from "three";
 
 type ARCanvasProps = {
@@ -44,7 +44,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Top-left control: Enter AR button OR 3D-only badge */}
+      {/* Top-left: Enter AR button OR 3D-only badge */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -99,7 +99,7 @@ export default function ARCanvas({
         >
           <div
             style={{
-              maxWidth: 320,
+              maxWidth: 340,
               backgroundColor: "rgba(0,0,0,0.75)",
               color: "#fff",
               padding: "10px 16px",
@@ -118,7 +118,10 @@ export default function ARCanvas({
                   look at your wall to see the artwork.
                 </>
               ) : (
-                <>Rotate and move to preview this piece in 3D.</>
+                <>
+                  Drag to rotate and pinch or scroll to zoom. This is a
+                  true-to-scale 3D preview of your selected size.
+                </>
               )}
             </span>
             <button
@@ -138,8 +141,8 @@ export default function ARCanvas({
         </div>
       )}
 
-      <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
-        {/* XR takes over the camera when AR is active; otherwise it's just 3D */}
+      <Canvas camera={{ position: [0, 0.5, 2.2], fov: 45 }}>
+        {/* XR takes over the camera only when AR is active; otherwise it's just 3D */}
         <XR store={xrStore}>
           {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
@@ -152,6 +155,17 @@ export default function ARCanvas({
             height={heightMeters}
             textureUrl={textureUrl}
           />
+
+          {/* In 3D-only mode, allow interaction with OrbitControls */}
+          {!canUseWebXR && (
+            <OrbitControls
+              enablePan={false}
+              enableDamping
+              dampingFactor={0.1}
+              minDistance={1.0}
+              maxDistance={4.0}
+            />
+          )}
         </XR>
       </Canvas>
     </div>
@@ -167,7 +181,7 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Distance kept at 1.5m, height at ~1.1m (~hung piece)
+  // Distance kept at ~1.5–2m, height at ~1.1m (~hung piece)
   const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
