@@ -1,6 +1,5 @@
 // src/components/ARCanvas.tsx
 
-import React from "react";
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
@@ -11,7 +10,7 @@ type ARCanvasProps = {
   textureUrl: string;
 };
 
-// Create a single XR store for the whole app
+// Single XR store for the app
 const xrStore = createXRStore();
 
 export default function ARCanvas({
@@ -28,7 +27,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Button that actually enters AR on supported devices */}
+      {/* Button to enter AR on supported devices */}
       <button
         onClick={() => xrStore.enterAR()}
         style={{
@@ -53,7 +52,7 @@ export default function ARCanvas({
           <ambientLight intensity={0.9} />
           <directionalLight position={[1, 2, 3]} intensity={1.1} />
 
-          {/* Artwork rendered at real-world size, ~1.4m high and 2m in front */}
+          {/* Artwork at real-world size, roughly 2m in front at eye height */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -65,20 +64,17 @@ export default function ARCanvas({
   );
 }
 
-function ArtworkPlane({
-  width,
-  height,
-  textureUrl,
-}: {
+type ArtworkPlaneProps = {
   width: number;
   height: number;
   textureUrl: string;
-}) {
+};
+
+function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
   return (
     <mesh position={[0, 1.4, -2]} rotation={[0, Math.PI, 0]}>
-      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} />
     </mesh>
