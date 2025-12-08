@@ -3,6 +3,7 @@
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
+import { DoubleSide } from "three";
 
 type ARCanvasProps = {
   widthMeters: number;
@@ -47,12 +48,13 @@ export default function ARCanvas({
         Enter AR
       </button>
 
-      <Canvas camera={{ position: [0, 1.4, 0] }}>
+      <Canvas>
+        {/* XR wraps the scene and controls the camera when in AR */}
         <XR store={xrStore}>
           <ambientLight intensity={0.9} />
           <directionalLight position={[1, 2, 3]} intensity={1.1} />
 
-          {/* Artwork at real-world size, roughly 2m in front at eye height */}
+          {/* Artwork placed ~1 meter in front of the user */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -74,9 +76,10 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
   return (
-    <mesh position={[0, 1.4, -2]} rotation={[0, Math.PI, 0]}>
+    <mesh position={[0, 0, -1]}>
+      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
-      <meshStandardMaterial map={texture} />
+      <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
   );
 }
