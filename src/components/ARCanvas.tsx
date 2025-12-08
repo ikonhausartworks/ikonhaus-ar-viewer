@@ -143,9 +143,9 @@ export default function ARCanvas({
 
       <Canvas
         camera={{
-          // Preview camera: same height as the art, a bit back so it fills nicely
-          position: [0, 1.1, 2],
-          fov: 45,
+          // Simple, robust camera: at origin, looking down -Z
+          position: [0, 0, 0],
+          fov: 60,
         }}
       >
         {/* XR takes over the camera only when AR is active; otherwise it's just 3D */}
@@ -155,7 +155,7 @@ export default function ARCanvas({
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
 
-          {/* Artwork at “gallery-ish” height and distance */}
+          {/* Artwork directly in front of the camera in preview / AR */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -176,8 +176,8 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // AR placement: ~1.5m away, mid-wall height (you said this feels good)
-  const position: [number, number, number] = [0, 1.1, -1.5];
+  // Plane centred, 1.5m in front of the origin
+  const position: [number, number, number] = [0, 0, -1.5];
 
   return (
     <mesh position={position}>
