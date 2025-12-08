@@ -1,6 +1,6 @@
 // src/components/ARCanvas.tsx
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
@@ -10,7 +10,7 @@ type ARCanvasProps = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
-  canUseWebXR: boolean;
+  canUseWebXR: boolean; // kept for future Mode C support
 };
 
 // Single XR store shared by this AR experience
@@ -22,16 +22,11 @@ export default function ARCanvas({
   textureUrl,
   canUseWebXR,
 }: ARCanvasProps) {
-  const [showHint, setShowHint] = useState(true);
-
-  // Auto-hide the hint after a few seconds
-  useEffect(() => {
-    const timer = setTimeout(() => setShowHint(false), 4000);
-    return () => clearTimeout(timer);
-  }, []);
+  const [showHint, setShowHint] = useState(false);
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
+    setShowHint(true);
     xrStore.enterAR();
   };
 
@@ -44,7 +39,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* Top-left control: Enter AR button OR 3D-only badge */}
+      {/* Top-left control */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -83,8 +78,8 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Simple instructions BEFORE immersive AR */}
-      {showHint && (
+      {/* Instructions overlay – only after AR is started */}
+      {showHint && canUseWebXR && (
         <div
           style={{
             position: "absolute",
@@ -112,14 +107,8 @@ export default function ARCanvas({
             }}
           >
             <span>
-              {canUseWebXR ? (
-                <>
-                  Tap <strong>Enter AR</strong>, then move your phone slowly and
-                  look at your wall to see the artwork.
-                </>
-              ) : (
-                <>Rotate and move to preview this piece in 3D.</>
-              )}
+              Move your phone slowly, then look at your wall to see the
+              artwork.
             </span>
             <button
               type="button"
@@ -139,14 +128,13 @@ export default function ARCanvas({
       )}
 
       <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
-        {/* XR takes over the camera when AR is active; otherwise it's just 3D */}
+        {/* XR takes over the camera when AR is active */}
         <XR store={xrStore}>
           {/* Soft, gallery-like lighting */}
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
           <pointLight position={[-2, 2, -2]} intensity={0.4} />
 
-          {/* Artwork at “gallery-ish” height and distance */}
           <ArtworkPlane
             width={widthMeters}
             height={heightMeters}
@@ -167,12 +155,11 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Raised ~0.3m (about 1 ft) and moved back ~0.15m (about 6 in)
-  const position: [number, number, number] = [0, 1.4, -1.65];
+  // Same placement that felt “stuck to the wall” to you
+  const position: [number, number, number] = [0, 0.8, -1.5];
 
   return (
     <mesh position={position}>
-      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
