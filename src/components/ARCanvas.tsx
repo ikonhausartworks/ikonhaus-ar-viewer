@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore } from "@react-three/xr";
-import { useTexture, OrbitControls } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import { DoubleSide } from "three";
 
 type ARCanvasProps = {
@@ -119,8 +119,8 @@ export default function ARCanvas({
                 </>
               ) : (
                 <>
-                  Drag to rotate and pinch or scroll to zoom. This is a
-                  true-to-scale 3D preview of your selected size.
+                  This is a true-to-scale 3D preview of your selected size.
+                  Rotate your device to see it from different angles.
                 </>
               )}
             </span>
@@ -141,7 +141,13 @@ export default function ARCanvas({
         </div>
       )}
 
-      <Canvas camera={{ position: [0, 0.5, 2.2], fov: 45 }}>
+      <Canvas
+        camera={{
+          // Pre-AR camera: roughly eye height and closer to the artwork
+          position: [0, 1.1, 0.5],
+          fov: 40,
+        }}
+      >
         {/* XR takes over the camera only when AR is active; otherwise it's just 3D */}
         <XR store={xrStore}>
           {/* Soft, gallery-like lighting */}
@@ -155,17 +161,6 @@ export default function ARCanvas({
             height={heightMeters}
             textureUrl={textureUrl}
           />
-
-          {/* In 3D-only mode, allow interaction with OrbitControls */}
-          {!canUseWebXR && (
-            <OrbitControls
-              enablePan={false}
-              enableDamping
-              dampingFactor={0.1}
-              minDistance={1.0}
-              maxDistance={4.0}
-            />
-          )}
         </XR>
       </Canvas>
     </div>
@@ -181,7 +176,7 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Distance kept at ~1.5–2m, height at ~1.1m (~hung piece)
+  // Distance kept at ~1.5m, height at ~1.1m (~hung piece in AR)
   const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
