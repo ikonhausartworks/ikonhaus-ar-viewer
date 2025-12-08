@@ -76,7 +76,7 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
   return (
-    <mesh position={[0, 0, -1]}>
+    <mesh position={[0, 1.5, -2]}>
       {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
