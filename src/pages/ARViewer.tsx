@@ -96,7 +96,7 @@ export default function ARViewer() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            padding: "40px",
+            padding: "20px",
           }}
         >
           <div
@@ -105,12 +105,12 @@ export default function ARViewer() {
               maxWidth: "350px",
               backgroundColor: "#000",
               borderRadius: "16px",
-              padding: "30px",
+              padding: "20px",
               border: "1px solid #444",
               textAlign: "center",
             }}
           >
-            <h2 style={{ marginTop: "20px", fontSize: "1.4rem" }}>
+            <h2 style={{ marginTop: "30px", fontSize: "1.4rem" }}>
               Before You Preview
             </h2>
 
