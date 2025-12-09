@@ -89,8 +89,8 @@ export default function ARViewer() {
             position: "fixed",
             top: 0,
             left: 0,
-            width: "90vw",
-            height: "90vh",
+            width: "85vw",
+            height: "85vh",
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
@@ -102,7 +102,7 @@ export default function ARViewer() {
           <div
             style={{
               width: "92%",
-              maxWidth: "400px",
+              maxWidth: "350px",
               backgroundColor: "#000",
               borderRadius: "16px",
               padding: "20px",
