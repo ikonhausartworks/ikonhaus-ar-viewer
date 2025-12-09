@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { XR, createXRStore } from "@react-three/xr";
+import { XR, createXRStore, useXR } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
 import { DoubleSide } from "three";
 
@@ -13,6 +13,7 @@ type ARCanvasProps = {
   canUseWebXR: boolean;
 };
 
+// Single XR store shared by this AR experience
 const xrStore = createXRStore();
 
 export default function ARCanvas({
@@ -38,6 +39,7 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
+      {/* Top-left control */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -76,6 +78,7 @@ export default function ARCanvas({
         </div>
       )}
 
+      {/* Hint after entering AR */}
       {showHint && canUseWebXR && (
         <div
           style={{
@@ -103,7 +106,10 @@ export default function ARCanvas({
               pointerEvents: "auto",
             }}
           >
-            <span>Move your phone slowly, then look at your wall.</span>
+            <span>
+              Move your phone slowly, then look at your wall to see the
+              artwork.
+            </span>
             <button
               type="button"
               onClick={() => setShowHint(false)}
@@ -121,7 +127,9 @@ export default function ARCanvas({
         </div>
       )}
 
+      {/* IMPORTANT: camera unchanged from your working AR setup */}
       <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
+        {/* XR takes over the camera only when AR is active */}
         <XR store={xrStore}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
@@ -146,15 +154,20 @@ type ArtworkPlaneProps = {
 
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
+  const { isPresenting } = useXR();
 
-  // EXPLICIT XYZ:
-  // X = 0     → centered horizontally
-  // Y = -0.1  → 10cm below camera/eye level
-  // Z = -1.2  → 1.2m in front of the camera
-  const position: [number, number, number] = [0, 1.1, -1.8];
+  // ✅ AR placement: DO NOT TOUCH — this is your calibrated “feels right” setting
+  const arPosition: [number, number, number] = [0, 1.1, -1.8];
+
+  // ✅ Preview placement: centered and a bit back so it actually shows nicely
+  const previewPosition: [number, number, number] = [0, 0, -2.2];
+
+  // When AR session is active, use AR position; otherwise use preview position
+  const position = isPresenting ? arPosition : previewPosition;
 
   return (
     <mesh position={position}>
+      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
