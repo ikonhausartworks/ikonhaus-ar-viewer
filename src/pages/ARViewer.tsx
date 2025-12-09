@@ -71,7 +71,7 @@ export default function ARViewer() {
         minHeight: "100vh",
         backgroundColor: "#111",
         color: "#fff",
-        padding: "12px",
+        padding: "10px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -81,7 +81,7 @@ export default function ARViewer() {
       <h1
         style={{
           fontSize: "1.8rem",
-          marginBottom: "4px",
+          marginBottom: "3px",
           textAlign: "center",
         }}
       >
@@ -90,7 +90,7 @@ export default function ARViewer() {
 
       <p
         style={{
-          marginBottom: "8px",
+          marginBottom: "6px",
           opacity: 0.8,
           textAlign: "center",
           fontSize: "0.85rem",
@@ -103,7 +103,7 @@ export default function ARViewer() {
       {capabilities && !webxrSupported && (
         <p
           style={{
-            marginBottom: "8px",
+            marginBottom: "6px",
             fontSize: "0.8rem",
             opacity: 0.7,
             textAlign: "center",
@@ -119,7 +119,7 @@ export default function ARViewer() {
         style={{
           display: "flex",
           gap: "8px",
-          marginBottom: "12px",
+          marginBottom: "10px",
         }}
       >
         {artwork.sizes.map((size) => (
@@ -158,12 +158,12 @@ export default function ARViewer() {
         <button
           onClick={handleStartPreview}
           style={{
-            padding: "9px 18px",
+            padding: "8px 16px",
             borderRadius: "10px",
             backgroundColor: "#fff",
             color: "#000",
             fontWeight: 600,
-            marginBottom: "10px",
+            marginBottom: "8px",
             cursor: "pointer",
             fontSize: "0.9rem",
           }}
@@ -178,8 +178,8 @@ export default function ARViewer() {
           style={{
             width: "100%",
             maxWidth: "460px",
-            height: "45vh", // a bit shorter so whole UI fits on screen
-            marginBottom: "14px",
+            height: "40vh", // trimmed so entire UI fits on screen
+            marginBottom: "12px",
             borderRadius: "16px",
             overflow: "hidden",
             border: "1px solid #333",
@@ -200,7 +200,7 @@ export default function ARViewer() {
         style={{
           display: "flex",
           gap: "8px",
-          marginBottom: "4px",
+          marginBottom: "2px",
         }}
       >
         <button
@@ -254,11 +254,11 @@ export default function ARViewer() {
 
       <p
         style={{
-          marginTop: "4px",
+          marginTop: "2px",
           fontSize: "0.78rem",
           opacity: 0.6,
           textAlign: "center",
-          lineHeight: 1.3,
+          lineHeight: 1.25,
         }}
       >
         Selected size: {selectedSize.label}
