@@ -96,7 +96,7 @@ export default function ARViewer() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            padding: "20px",
+            padding: "40px",
           }}
         >
           <div
