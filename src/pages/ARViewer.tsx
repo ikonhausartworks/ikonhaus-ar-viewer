@@ -71,7 +71,7 @@ export default function ARViewer() {
         minHeight: "100vh",
         backgroundColor: "#111",
         color: "#fff",
-        padding: "10px",
+        padding: "10px 16px 12px", // a bit more horizontal padding
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -176,9 +176,9 @@ export default function ARViewer() {
       {arMode && (
         <div
           style={{
-            width: "100%",
-            maxWidth: "460px",
-            height: "40vh", // trimmed so entire UI fits on screen
+            width: "92%",               // narrower than full width
+            maxWidth: "440px",
+            height: "40vh",
             marginBottom: "12px",
             borderRadius: "16px",
             overflow: "hidden",
