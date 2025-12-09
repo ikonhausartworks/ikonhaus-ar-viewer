@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { XR, createXRStore, useXR } from "@react-three/xr";
+import { XR, createXRStore } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
 import { DoubleSide } from "three";
 
@@ -23,10 +23,12 @@ export default function ARCanvas({
   canUseWebXR,
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(false);
+  const [inAR, setInAR] = useState(false); // local flag: user has entered AR
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
     setShowHint(true);
+    setInAR(true);
     xrStore.enterAR();
   };
 
@@ -127,7 +129,7 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* IMPORTANT: camera unchanged from your working AR setup */}
+      {/* Camera config unchanged from your working AR setup */}
       <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
         {/* XR takes over the camera only when AR is active */}
         <XR store={xrStore}>
@@ -139,6 +141,8 @@ export default function ARCanvas({
             width={widthMeters}
             height={heightMeters}
             textureUrl={textureUrl}
+            inAR={inAR}
+            canUseWebXR={canUseWebXR}
           />
         </XR>
       </Canvas>
@@ -150,20 +154,29 @@ type ArtworkPlaneProps = {
   width: number;
   height: number;
   textureUrl: string;
+  inAR: boolean;
+  canUseWebXR: boolean;
 };
 
-function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
+function ArtworkPlane({
+  width,
+  height,
+  textureUrl,
+  inAR,
+  canUseWebXR,
+}: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
-  const { isPresenting } = useXR();
 
-  // ✅ AR placement: DO NOT TOUCH — this is your calibrated “feels right” setting
+  // ✅ AR placement: your calibrated, “feels right” setting – DO NOT TOUCH
   const arPosition: [number, number, number] = [0, 1.1, -1.8];
 
-  // ✅ Preview placement: centered and a bit back so it actually shows nicely
+  // ✅ Preview placement: centered and a bit back so it shows nicely
   const previewPosition: [number, number, number] = [0, 0, -2.2];
 
-  // When AR session is active, use AR position; otherwise use preview position
-  const position = isPresenting ? arPosition : previewPosition;
+  // When on a WebXR device *and* the user has tapped Enter AR, use AR position.
+  // Otherwise (before AR, or on non-WebXR devices), use preview position.
+  const useARPosition = canUseWebXR && inAR;
+  const position = useARPosition ? arPosition : previewPosition;
 
   return (
     <mesh position={position}>
