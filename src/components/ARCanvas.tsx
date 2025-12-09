@@ -13,7 +13,6 @@ type ARCanvasProps = {
   canUseWebXR: boolean;
 };
 
-// Single XR store shared by this AR experience
 const xrStore = createXRStore();
 
 export default function ARCanvas({
@@ -23,7 +22,7 @@ export default function ARCanvas({
   canUseWebXR,
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(false);
-  const [inAR, setInAR] = useState(false); // local flag: user has entered AR
+  const [inAR, setInAR] = useState(false); // user has entered AR
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
@@ -129,9 +128,8 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Camera config unchanged from your working AR setup */}
-      <Canvas camera={{ position: [0, 0, 0], fov: 50 }}>
-        {/* XR takes over the camera only when AR is active */}
+      {/* 👇 Only change: better preview camera */}
+      <Canvas camera={{ position: [0, 0, 2], fov: 45 }}>
         <XR store={xrStore}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[2, 4, 3]} intensity={1.1} />
@@ -167,20 +165,17 @@ function ArtworkPlane({
 }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // ✅ AR placement: your calibrated, “feels right” setting – DO NOT TOUCH
+  // ✅ AR placement: your calibrated, “feels right” setting
   const arPosition: [number, number, number] = [0, 1.1, -1.8];
 
-  // ✅ Preview placement: centered and a bit back so it shows nicely
+  // ✅ Preview placement: centered, a bit back, nice framing
   const previewPosition: [number, number, number] = [0, 0, -2.2];
 
-  // When on a WebXR device *and* the user has tapped Enter AR, use AR position.
-  // Otherwise (before AR, or on non-WebXR devices), use preview position.
   const useARPosition = canUseWebXR && inAR;
   const position = useARPosition ? arPosition : previewPosition;
 
   return (
     <mesh position={position}>
-      {/* Plane sized according to the selected print dimensions */}
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
