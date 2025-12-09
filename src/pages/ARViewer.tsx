@@ -38,6 +38,7 @@ export default function ARViewer() {
   const selectedSize: ArtworkSize =
     artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
 
+  // Session start + capabilities
   useEffect(() => {
     trackEvent("ar_session_start", {
       artId: artwork.id,
@@ -54,6 +55,22 @@ export default function ARViewer() {
       webxrSupported: caps.webxrSupported,
     });
   }, [artwork.id, artwork.title]);
+
+  // Preflight shown (once per mount)
+  useEffect(() => {
+    trackEvent("ar_preflight_shown" as any, {
+      artId: artwork.id,
+    });
+  }, [artwork.id]);
+
+  // Session end when viewer unmounts
+  useEffect(() => {
+    return () => {
+      trackEvent("ar_session_end" as any, {
+        artId: artwork.id,
+      });
+    };
+  }, [artwork.id]);
 
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
@@ -85,13 +102,13 @@ export default function ARViewer() {
         <div
           style={{
             position: "fixed",
-            inset: 0, // top:0, right:0, bottom:0, left:0
+            inset: 0,
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",
-            overflowY: "auto", // <- allow scroll if content taller than viewport
+            overflowY: "auto",
           }}
         >
           <div
@@ -139,7 +156,7 @@ export default function ARViewer() {
               style={{
                 width: "100%",
                 height: "auto",
-                maxHeight: "75vh", // <- prevents pushing button off-screen
+                maxHeight: "75vh",
                 objectFit: "contain",
                 borderRadius: "10px",
                 marginBottom: "16px",
@@ -147,7 +164,14 @@ export default function ARViewer() {
             />
 
             <button
-              onClick={() => setShowPreflight(false)}
+              onClick={() => {
+                trackEvent("ar_preflight_dismissed" as any, {
+                  artId: artwork.id,
+                  sizeId: selectedSize.id,
+                  sizeLabel: selectedSize.label,
+                });
+                setShowPreflight(false);
+              }}
               style={{
                 padding: "10px 20px",
                 borderRadius: "10px",
@@ -215,7 +239,7 @@ export default function ARViewer() {
             key={size.id}
             onClick={() => {
               setSelectedSizeId(size.id);
-              trackEvent("ar_size_change", {
+              trackEvent("ar_size_change" as any, {
                 artId: artwork.id,
                 newSizeId: size.id,
                 newSizeLabel: size.label,
@@ -281,6 +305,9 @@ export default function ARViewer() {
             heightMeters={selectedSize.heightMeters}
             textureUrl={selectedSize.textureUrl}
             canUseWebXR={webxrSupported}
+            artId={artwork.id}
+            sizeId={selectedSize.id}
+            sizeLabel={selectedSize.label}
           />
         </div>
       )}
@@ -295,7 +322,7 @@ export default function ARViewer() {
       >
         <button
           onClick={() => {
-            trackEvent("ar_cta_click", {
+            trackEvent("ar_cta_click" as any, {
               artId: artwork.id,
               sizeId: selectedSize.id,
               sizeLabel: selectedSize.label,
@@ -319,7 +346,7 @@ export default function ARViewer() {
 
         <button
           onClick={() => {
-            trackEvent("ar_cta_click", {
+            trackEvent("ar_cta_click" as any, {
               artId: artwork.id,
               sizeId: selectedSize.id,
               sizeLabel: selectedSize.label,
