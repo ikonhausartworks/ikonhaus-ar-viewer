@@ -151,7 +151,7 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   // X = 0     → centered horizontally
   // Y = -0.1  → 10cm below camera/eye level
   // Z = -1.2  → 1.2m in front of the camera
-  const position: [number, number, number] = [0, 1.1, -1.5];
+  const position: [number, number, number] = [0, 1.1, -1.8];
 
   return (
     <mesh position={position}>
