@@ -58,9 +58,7 @@ export default function ARViewer() {
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
   const handleStartPreview = () => {
-    // Only allow preview after preflight is closed
-    if (showPreflight) return;
-
+    if (showPreflight) return; // still showing instructions
     setArMode(true);
     trackEvent("ar_preview_started" as any, {
       artId: artwork.id,
@@ -82,35 +80,43 @@ export default function ARViewer() {
         alignItems: "center",
       }}
     >
-      {/* 🔥 PREFLIGHT MODAL — MUST COMPLETE BEFORE USING PREVIEW */}
+      {/* 🔥 PREFLIGHT MODAL */}
       {showPreflight && (
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            width: "85vw",
-            height: "85vh",
+            inset: 0, // top:0, right:0, bottom:0, left:0
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
             justifyContent: "center",
-            alignItems: "center",
-            padding: "20px",
+            alignItems: "flex-start",
+            overflowY: "auto", // <- allow scroll if content taller than viewport
           }}
         >
           <div
             style={{
               width: "92%",
-              maxWidth: "350px",
+              maxWidth: "420px",
+              margin: "40px auto 24px",
               backgroundColor: "#000",
               borderRadius: "16px",
               padding: "20px",
               border: "1px solid #444",
               textAlign: "center",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.6)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              maxHeight: "calc(100vh - 64px)",
             }}
           >
-            <h2 style={{ marginTop: "30px", fontSize: "1.4rem" }}>
+            <h2
+              style={{
+                marginBottom: "10px",
+                fontSize: "1.4rem",
+              }}
+            >
               Before You Preview
             </h2>
 
@@ -126,14 +132,17 @@ export default function ARViewer() {
               your wall and hold your phone at a comfortable viewing distance.
             </p>
 
-            {/* The illustration you provided */}
+            {/* Illustration image */}
             <img
               src="https://static.wixstatic.com/media/f656fb_d9c2c7275b93472889244406e727a77f~mv2.png"
               alt="How to hold your phone before using AR"
               style={{
-                width: "90%",
+                width: "100%",
+                height: "auto",
+                maxHeight: "40vh", // <- prevents pushing button off-screen
+                objectFit: "contain",
                 borderRadius: "10px",
-                marginBottom: "14px",
+                marginBottom: "16px",
               }}
             />
 
@@ -147,6 +156,7 @@ export default function ARViewer() {
                 fontWeight: 600,
                 cursor: "pointer",
                 fontSize: "0.95rem",
+                border: "none",
               }}
             >
               Got It
