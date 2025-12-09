@@ -1,17 +1,50 @@
 // src/utils/analytics.ts
 
-export type ARAnalyticsEvent =
-  | "ar_session_start"
-  | "ar_size_change"
-  | "ar_cta_click";
+// For now we keep this simple: any string is allowed as an event name.
+// (We already handle more specific names at the call sites.)
+export type ARAnalyticsEvent = string;
 
+export type ARAnalyticsPayload = Record<string, unknown> | undefined;
+
+// Let TypeScript know about window.clarity
+declare global {
+  interface Window {
+    clarity?: (...args: any[]) => void;
+  }
+}
+
+/**
+ * Central analytics helper.
+ *
+ * - In DEV: logs events to console.
+ * - In PROD: sends custom events to Microsoft Clarity, if available.
+ */
 export function trackEvent(
-  name: ARAnalyticsEvent,
-  payload: Record<string, any> = {}
+  event: ARAnalyticsEvent,
+  payload?: ARAnalyticsPayload
 ) {
-  // For now, just log to the console so you can see it working.
-  console.log("[AR EVENT]", name, payload);
+  // Dev logging so you can see events in the console during local testing
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[analytics]", event, payload ?? {});
+  }
 
-  // Later, you can plug this into GA4, Plausible, etc. For example:
-  // (window as any).gtag?.("event", name, payload);
+  if (typeof window === "undefined" || typeof window.clarity !== "function") {
+    return;
+  }
+
+  try {
+    // Clarity supports custom events: clarity("event", name, data)
+    if (payload && Object.keys(payload).length > 0) {
+      window.clarity("event", event, payload);
+    } else {
+      window.clarity("event", event);
+    }
+  } catch (err) {
+    // Fail safe – never break the app because of analytics
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn("[analytics] clarity event failed", err);
+    }
+  }
 }
