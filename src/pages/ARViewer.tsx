@@ -134,12 +134,12 @@ export default function ARViewer() {
 
             {/* Illustration image */}
             <img
-              src="https://static.wixstatic.com/media/f656fb_d9c2c7275b93472889244406e727a77f~mv2.png"
+              src="https://static.wixstatic.com/media/f656fb_d6a46a4b58434bc19003f5b3b6b18147~mv2.png"
               alt="How to hold your phone before using AR"
               style={{
                 width: "100%",
                 height: "auto",
-                maxHeight: "40vh", // <- prevents pushing button off-screen
+                maxHeight: "75vh", // <- prevents pushing button off-screen
                 objectFit: "contain",
                 borderRadius: "10px",
                 marginBottom: "16px",
