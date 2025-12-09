@@ -5,14 +5,19 @@ import { Canvas } from "@react-three/fiber";
 import { XR, createXRStore, useXR } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
 import { DoubleSide } from "three";
+import { trackEvent } from "../utils/analytics";
 
 type ARCanvasProps = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
   canUseWebXR: boolean;
+  artId: string;
+  sizeId: string;
+  sizeLabel: string;
 };
 
+// Single XR store shared by this AR experience
 const xrStore = createXRStore();
 
 export default function ARCanvas({
@@ -20,11 +25,22 @@ export default function ARCanvas({
   heightMeters,
   textureUrl,
   canUseWebXR,
+  artId,
+  sizeId,
+  sizeLabel,
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(false);
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
+
+    // Analytics: user taps Enter AR
+    trackEvent("ar_enter_ar_click" as any, {
+      artId,
+      sizeId,
+      sizeLabel,
+    });
+
     setShowHint(true);
     xrStore.enterAR();
   };
@@ -165,12 +181,12 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
 
   const position = isPresenting ? arPosition : previewPosition;
 
-  // ✅ 1) Physical correction so AR matches your real 16×20 outer size
-  const physicalScaleCorrection = 1.22; // tuned vs real 16x20 at ~2m distance // phone held mid-forearm (not full extension).
+  // ✅ Physical correction so AR matches your real 16×20 outer size
+  const physicalScaleCorrection = 1.22; // tuned vs real 16x20 at ~2m distance
   const baseWidth = width * physicalScaleCorrection;
   const baseHeight = height * physicalScaleCorrection;
 
-  // ✅ 2) Extra visual boost ONLY in preview (so it’s not tiny in the card)
+  // ✅ Extra visual boost ONLY in preview (so it’s not tiny in the card)
   const previewScaleFactor = 3.0;
   const scale = isPresenting ? 1 : previewScaleFactor;
 
