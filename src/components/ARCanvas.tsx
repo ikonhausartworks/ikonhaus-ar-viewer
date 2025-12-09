@@ -166,7 +166,7 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const position = isPresenting ? arPosition : previewPosition;
 
   // ✅ 1) Physical correction so AR matches your real 16×20 outer size
-  const physicalScaleCorrection = 1.30; // tuned vs real 16x20 at ~1.7m distance
+  const physicalScaleCorrection = 1.28; // tuned vs real 16x20 at ~1.7m distance
   const baseWidth = width * physicalScaleCorrection;
   const baseHeight = height * physicalScaleCorrection;
 
