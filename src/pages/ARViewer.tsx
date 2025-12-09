@@ -97,7 +97,7 @@ export default function ARViewer() {
           lineHeight: 1.3,
         }}
       >
-        Choose your artworks size and then preview this piece at true scale in AR.
+        Choose your artwork’s size and then preview this piece at true scale in AR.
       </p>
 
       {capabilities && !webxrSupported && (
@@ -263,8 +263,8 @@ export default function ARViewer() {
       >
         Selected size: {selectedSize.label}
         <br />
-        For the most accurate AR sizing, stand 2m from your wall and extend your phone in front of you
-        before pressing Enter AR.
+        For the most accurate AR sizing, stand 2m from your wall and hold your phone
+        comfortably in front of you before pressing Enter AR.
       </p>
     </div>
   );
