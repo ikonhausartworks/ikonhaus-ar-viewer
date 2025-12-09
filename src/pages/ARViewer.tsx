@@ -30,8 +30,10 @@ export default function ARViewer() {
   const [selectedSizeId, setSelectedSizeId] = useState<string>(
     artwork.defaultSizeId
   );
+
   const [arMode, setArMode] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ARCapabilities | null>(null);
+  const [showPreflight, setShowPreflight] = useState<boolean>(true);
 
   const selectedSize: ArtworkSize =
     artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
@@ -56,6 +58,9 @@ export default function ARViewer() {
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
   const handleStartPreview = () => {
+    // Only allow preview after preflight is closed
+    if (showPreflight) return;
+
     setArMode(true);
     trackEvent("ar_preview_started" as any, {
       artId: artwork.id,
@@ -71,12 +76,85 @@ export default function ARViewer() {
         minHeight: "100vh",
         backgroundColor: "#111",
         color: "#fff",
-        padding: "10px 16px 12px", // a bit more horizontal padding
+        padding: "10px 16px 12px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
       }}
     >
+      {/* 🔥 PREFLIGHT MODAL — MUST COMPLETE BEFORE USING PREVIEW */}
+      {showPreflight && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.82)",
+            zIndex: 3000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "92%",
+              maxWidth: "420px",
+              backgroundColor: "#000",
+              borderRadius: "16px",
+              padding: "20px",
+              border: "1px solid #444",
+              textAlign: "center",
+            }}
+          >
+            <h2 style={{ marginBottom: "10px", fontSize: "1.4rem" }}>
+              Before You Preview
+            </h2>
+
+            <p
+              style={{
+                opacity: 0.85,
+                fontSize: "0.95rem",
+                lineHeight: 1.4,
+                marginBottom: "14px",
+              }}
+            >
+              For accurate AR sizing, stand about <strong>2 meters</strong> from
+              your wall and hold your phone at a comfortable viewing distance.
+            </p>
+
+            {/* The illustration you provided */}
+            <img
+              src="https://static.wixstatic.com/media/f656fb_d9c2c7275b93472889244406e727a77f~mv2.png"
+              alt="How to hold your phone before using AR"
+              style={{
+                width: "100%",
+                borderRadius: "10px",
+                marginBottom: "14px",
+              }}
+            />
+
+            <button
+              onClick={() => setShowPreflight(false)}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "10px",
+                backgroundColor: "#fff",
+                color: "#000",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "0.95rem",
+              }}
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top section */}
       <h1
         style={{
@@ -97,7 +175,7 @@ export default function ARViewer() {
           lineHeight: 1.3,
         }}
       >
-        Choose your artwork’s size and then preview this piece at true scale in AR.
+        Choose your artwork size and then preview this piece at true scale in AR.
       </p>
 
       {capabilities && !webxrSupported && (
@@ -157,14 +235,16 @@ export default function ARViewer() {
       {!arMode && (
         <button
           onClick={handleStartPreview}
+          disabled={showPreflight}
           style={{
+            opacity: showPreflight ? 0.4 : 1,
             padding: "8px 16px",
             borderRadius: "10px",
             backgroundColor: "#fff",
             color: "#000",
             fontWeight: 600,
             marginBottom: "8px",
-            cursor: "pointer",
+            cursor: showPreflight ? "not-allowed" : "pointer",
             fontSize: "0.9rem",
           }}
         >
@@ -176,7 +256,7 @@ export default function ARViewer() {
       {arMode && (
         <div
           style={{
-            width: "92%",               // narrower than full width
+            width: "92%",
             maxWidth: "440px",
             height: "40vh",
             marginBottom: "12px",
@@ -263,8 +343,8 @@ export default function ARViewer() {
       >
         Selected size: {selectedSize.label}
         <br />
-        For the most accurate AR sizing, stand 2m from your wall and hold your phone
-        comfortably in front of you before pressing Enter AR.
+        For the most accurate AR sizing, stand about 2m from your wall and hold
+        your phone in front of you before pressing Enter AR.
       </p>
     </div>
   );
