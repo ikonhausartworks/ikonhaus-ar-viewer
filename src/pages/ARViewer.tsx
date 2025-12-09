@@ -90,7 +90,7 @@ export default function ARViewer() {
             top: 0,
             left: 0,
             width: "85vw",
-            height: "85vh",
+            height: "75vh",
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
@@ -105,7 +105,7 @@ export default function ARViewer() {
               maxWidth: "350px",
               backgroundColor: "#000",
               borderRadius: "16px",
-              padding: "20px",
+              padding: "30px",
               border: "1px solid #444",
               textAlign: "center",
             }}
