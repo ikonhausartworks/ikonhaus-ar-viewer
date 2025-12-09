@@ -89,8 +89,8 @@ export default function ARViewer() {
             position: "fixed",
             top: 0,
             left: 0,
-            width: "100vw",
-            height: "100vh",
+            width: "90vw",
+            height: "90vh",
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
@@ -102,7 +102,7 @@ export default function ARViewer() {
           <div
             style={{
               width: "92%",
-              maxWidth: "420px",
+              maxWidth: "400px",
               backgroundColor: "#000",
               borderRadius: "16px",
               padding: "20px",
@@ -131,7 +131,7 @@ export default function ARViewer() {
               src="https://static.wixstatic.com/media/f656fb_d9c2c7275b93472889244406e727a77f~mv2.png"
               alt="How to hold your phone before using AR"
               style={{
-                width: "100%",
+                width: "90%",
                 borderRadius: "10px",
                 marginBottom: "14px",
               }}
