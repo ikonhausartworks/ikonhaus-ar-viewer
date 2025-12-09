@@ -90,7 +90,7 @@ export default function ARViewer() {
             top: 0,
             left: 0,
             width: "85vw",
-            height: "75vh",
+            height: "85vh",
             backgroundColor: "rgba(0,0,0,0.82)",
             zIndex: 3000,
             display: "flex",
@@ -110,7 +110,7 @@ export default function ARViewer() {
               textAlign: "center",
             }}
           >
-            <h2 style={{ marginBottom: "10px", fontSize: "1.4rem" }}>
+            <h2 style={{ marginTop: "20px", fontSize: "1.4rem" }}>
               Before You Preview
             </h2>
 
