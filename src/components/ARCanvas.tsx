@@ -156,37 +156,20 @@ type ArtworkPlaneProps = {
   canUseWebXR: boolean;
 };
 
-function ArtworkPlane({
-  width,
-  height,
-  textureUrl,
-  inAR,
-  canUseWebXR,
-}: ArtworkPlaneProps) {
+function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // ✅ AR placement: your calibrated, “feels right” setting – DO NOT TOUCH
-  const arPosition: [number, number, number] = [0, 1.1, -1.8];
+  // Real-world frame correction factor (~15%)
+  const scaleCorrection = 1.15;
 
-  // ✅ Preview placement: centered & closer so it looks good in the card
-  const previewPosition: [number, number, number] = [0, 0, -1.4];
-
-  // Are we in AR on a WebXR-capable device?
-  const useARPosition = canUseWebXR && inAR;
-  const position = useARPosition ? arPosition : previewPosition;
-
-  // ✅ Bigger in preview so it actually reads on mobile
-  //    but true-to-scale in AR.
-  const previewScaleFactor = 3.0; // tweak if you want it larger/smaller
-  const scale = useARPosition ? 1 : previewScaleFactor;
-
-  const displayWidth = width * scale;
-  const displayHeight = height * scale;
+  const realWidth = width * scaleCorrection; 
+  const realHeight = height * scaleCorrection;
 
   return (
-    <mesh position={position}>
-      <planeGeometry args={[displayWidth, displayHeight]} />
+    <mesh position={[0, 1.1, -1.8]}>
+      <planeGeometry args={[realWidth, realHeight]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
   );
 }
+
