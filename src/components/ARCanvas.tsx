@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { XR, createXRStore } from "@react-three/xr";
+import { XR, createXRStore, useXR } from "@react-three/xr";
 import { useTexture } from "@react-three/drei";
 import { DoubleSide } from "three";
 
@@ -22,12 +22,10 @@ export default function ARCanvas({
   canUseWebXR,
 }: ARCanvasProps) {
   const [showHint, setShowHint] = useState(false);
-  const [inAR, setInAR] = useState(false); // user has entered AR
 
   const handleEnterAR = () => {
     if (!canUseWebXR) return;
     setShowHint(true);
-    setInAR(true);
     xrStore.enterAR();
   };
 
@@ -128,7 +126,7 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Preview camera: pulled back slightly, tighter FOV */}
+      {/* Preview camera – AR overrides this when active */}
       <Canvas camera={{ position: [0, 0, 2], fov: 45 }}>
         <XR store={xrStore}>
           <ambientLight intensity={0.8} />
@@ -139,8 +137,6 @@ export default function ARCanvas({
             width={widthMeters}
             height={heightMeters}
             textureUrl={textureUrl}
-            inAR={inAR}
-            canUseWebXR={canUseWebXR}
           />
         </XR>
       </Canvas>
@@ -152,24 +148,39 @@ type ArtworkPlaneProps = {
   width: number;
   height: number;
   textureUrl: string;
-  inAR: boolean;
-  canUseWebXR: boolean;
 };
 
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Real-world frame correction factor (~15%)
-  const scaleCorrection = 1.15;
+  // Is an XR session currently active?
+  const session = useXR((xr) => xr.session);
+  const isPresenting = !!session;
 
-  const realWidth = width * scaleCorrection; 
-  const realHeight = height * scaleCorrection;
+  // ✅ AR placement: your calibrated “feels right” setting
+  const arPosition: [number, number, number] = [0, 1.1, -1.8];
+
+  // ✅ Preview placement: centered and closer in the card
+  const previewPosition: [number, number, number] = [0, 0, -1.4];
+
+  const position = isPresenting ? arPosition : previewPosition;
+
+  // ✅ 1) Physical correction so AR matches your real 16×20 outer size
+  const physicalScaleCorrection = 1.15; // tweak ±0.02 if needed
+  const baseWidth = width * physicalScaleCorrection;
+  const baseHeight = height * physicalScaleCorrection;
+
+  // ✅ 2) Extra visual boost ONLY in preview (so it’s not tiny in the card)
+  const previewScaleFactor = 3.0;
+  const scale = isPresenting ? 1 : previewScaleFactor;
+
+  const displayWidth = baseWidth * scale;
+  const displayHeight = baseHeight * scale;
 
   return (
-    <mesh position={[0, 1.1, -1.8]}>
-      <planeGeometry args={[realWidth, realHeight]} />
+    <mesh position={position}>
+      <planeGeometry args={[displayWidth, displayHeight]} />
       <meshStandardMaterial map={texture} side={DoubleSide} />
     </mesh>
   );
 }
-
