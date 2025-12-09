@@ -152,7 +152,7 @@ function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   // New improved placement:
   // → Higher by ~25%
   // → Closer to the wall by ~20%
-  const position: [number, number, number] = [0, 1.0, -1.2];
+  const position: [number, number, number] = [0, 1.1, -1.5];
 
   return (
     <mesh position={position}>
