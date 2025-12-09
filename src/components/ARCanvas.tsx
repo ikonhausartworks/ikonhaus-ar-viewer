@@ -38,7 +38,6 @@ export default function ARCanvas({
         backgroundColor: "#000",
       }}
     >
-      {/* AR / 3D control */}
       {canUseWebXR ? (
         <button
           onClick={handleEnterAR}
@@ -77,7 +76,6 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Hint after entering AR */}
       {showHint && canUseWebXR && (
         <div
           style={{
@@ -105,10 +103,7 @@ export default function ARCanvas({
               pointerEvents: "auto",
             }}
           >
-            <span>
-              Stand about 1–1.5m from your wall, tap Enter AR, then look
-              straight ahead to see the artwork.
-            </span>
+            <span>Move your phone slowly, then look at your wall.</span>
             <button
               type="button"
               onClick={() => setShowHint(false)}
@@ -152,19 +147,11 @@ type ArtworkPlaneProps = {
 function ArtworkPlane({ width, height, textureUrl }: ArtworkPlaneProps) {
   const texture = useTexture(textureUrl);
 
-  // Assumptions:
-  // - User ~1.2m from wall when AR starts
-  // - User eye level ~1.6m
-  // - Artwork center at ~1.5m from floor  → ~0.1m below eyes
-  // So relative to camera:
-  const distanceToWall = 1.2; // meters
-  const eyeLevel = 1.6; // meters
-  const artworkCenterHeight = 1.5; // meters
-
-  const y = artworkCenterHeight - eyeLevel; // ≈ -0.1
-  const z = -distanceToWall; // -1.2m in front of camera
-
-  const position: [number, number, number] = [0, y, z];
+  // EXPLICIT XYZ:
+  // X = 0     → centered horizontally
+  // Y = -0.1  → 10cm below camera/eye level
+  // Z = -1.2  → 1.2m in front of the camera
+  const position: [number, number, number] = [0, -0.1, -1.2];
 
   return (
     <mesh position={position}>
