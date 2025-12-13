@@ -12,6 +12,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+
+        {/* ✅ NEW: allows /ar?sku=XXXX */}
+        <Route path="/ar" element={<ARViewer />} />
+
+        {/* existing route – do NOT remove */}
         <Route path="/ar/:artId" element={<ARViewer />} />
       </Routes>
     </BrowserRouter>
