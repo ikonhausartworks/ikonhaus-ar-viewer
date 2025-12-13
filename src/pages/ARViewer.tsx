@@ -7,25 +7,24 @@ import { detectARCapabilities, type ARCapabilities } from "../utils/capabilities
 
 type WixMediaField =
   | string
-  | { url?: string; src?: string; fileUrl?: string }
+  | {
+      url?: string;
+      src?: string;
+      fileUrl?: string;
+    }
   | null
   | undefined;
 
 type CmsItem = {
   title?: string;
   artworkSlug?: string;
-
   sku: string;
-
-  sizeCode: string; // "16 x 20 inches"
-  frameColor: string; // "Black" / "White"
-  orientation: string; // "PORTRAIT" / "LANDSCAPE"
-
+  sizeCode: string;
+  frameColor: string;
+  orientation: string;
   arImageWebp: WixMediaField;
-
   pdpUrl?: string;
   addToCartUrl?: string;
-
   sortIndex?: number;
 };
 
@@ -61,10 +60,6 @@ export default function ARViewer() {
   const [capabilities, setCapabilities] = useState<ARCapabilities | null>(null);
   const [showPreflight, setShowPreflight] = useState<boolean>(true);
 
-  // NEW: preload status for the selected texture
-  const [textureReady, setTextureReady] = useState<boolean>(false);
-  const [textureError, setTextureError] = useState<string>("");
-
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
   // Capabilities
@@ -81,7 +76,6 @@ export default function ARViewer() {
       try {
         setLoadError("");
         setArtwork(null);
-        setArMode(false);
 
         const qs = artId
           ? `?artworkSlug=${encodeURIComponent(artId)}`
@@ -132,10 +126,7 @@ export default function ARViewer() {
           setSelectedSizeId(built.defaultSizeId);
         }
 
-        trackEvent("ar_session_start", {
-          artId: built.id,
-          title: built.title,
-        });
+        trackEvent("ar_session_start", { artId: built.id, title: built.title });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!cancelled) setLoadError(msg);
@@ -157,40 +148,8 @@ export default function ARViewer() {
     );
   }, [artwork, selectedSizeId]);
 
-  // NEW: Preload the selected texture before allowing AR
-  useEffect(() => {
-    setTextureReady(false);
-    setTextureError("");
-
-    if (!selectedSize) return;
-
-    const url = selectedSize.textureUrl;
-    if (!url) {
-      setTextureError("Missing texture URL for this variant.");
-      return;
-    }
-
-    const img = new Image();
-    img.onload = () => setTextureReady(true);
-    img.onerror = () =>
-      setTextureError(
-        "Could not load the artwork image for AR. (Bad URL or blocked resource.)"
-      );
-    img.src = url;
-  }, [selectedSizeId, selectedSize?.textureUrl]);
-
   const handleStartPreview = () => {
     if (showPreflight) return;
-
-    // Don’t enter AR if texture isn’t ready — this is what causes Enter AR → blank
-    if (!textureReady) {
-      trackEvent("ar_preview_blocked_texture_not_ready" as any, {
-        artId: artwork?.id,
-        sizeId: selectedSize?.id,
-      });
-      return;
-    }
-
     setArMode(true);
 
     if (artwork && selectedSize) {
@@ -209,15 +168,6 @@ export default function ARViewer() {
       <div style={{ padding: 20 }}>
         <h1>IkonHaus AR Viewer</h1>
         <p style={{ whiteSpace: "pre-wrap" }}>{loadError}</p>
-        <p>Try:</p>
-        <ul>
-          <li>
-            <code>/ar?sku=SP-1620-BLK</code>
-          </li>
-          <li>
-            <code>/ar/spherical-study-unknown</code>
-          </li>
-        </ul>
       </div>
     );
   }
@@ -231,16 +181,22 @@ export default function ARViewer() {
     );
   }
 
+  // ------- Layout constants -------
+  const STICKY_BAR_H = 84; // approx height of CTA bar + padding
+
   return (
     <div
       style={{
         minHeight: "100vh",
         backgroundColor: "#111",
         color: "#fff",
-        padding: "14px 16px 16px",
+        padding: "12px 14px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+
+        // leave room so sticky CTA doesn’t cover content
+        paddingBottom: `calc(${STICKY_BAR_H}px + env(safe-area-inset-bottom))`,
       }}
     >
       {/* PREFLIGHT */}
@@ -322,193 +278,217 @@ export default function ARViewer() {
         </div>
       )}
 
-      {/* Top */}
-      <h1 style={{ fontSize: "1.8rem", marginBottom: 6, textAlign: "center" }}>
+      {/* Title */}
+      <h1
+        style={{
+          fontSize: "clamp(1.35rem, 3.8vw, 1.9rem)",
+          margin: "6px 0 4px",
+          textAlign: "center",
+          lineHeight: 1.15,
+          maxWidth: 520,
+        }}
+      >
         {artwork.title}
       </h1>
 
       <p
         style={{
-          marginBottom: 10,
-          opacity: 0.85,
+          margin: "0 0 10px",
+          opacity: 0.78,
           textAlign: "center",
           fontSize: "0.9rem",
-          lineHeight: 1.3,
+          lineHeight: 1.25,
           maxWidth: 520,
         }}
       >
         Choose your variant and preview this piece at true scale.
       </p>
 
-      {/* Variant selector (scrollable + tidy) */}
+      {/* Variants panel (scrollable so screen doesn’t explode) */}
       <div
         style={{
           width: "100%",
-          maxWidth: 520,
+          maxWidth: 560,
           border: "1px solid #2a2a2a",
-          borderRadius: 16,
-          padding: 10,
+          borderRadius: 18,
+          padding: "10px 10px 12px",
           background: "rgba(0,0,0,0.25)",
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
         <div
           style={{
-            maxHeight: 170, // keeps it from taking over mobile screen
-            overflowY: "auto",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            marginBottom: 8,
+            gap: 10,
           }}
         >
-          {artwork.sizes.map((size) => (
-            <button
-              key={size.id}
-              onClick={() => {
-                setSelectedSizeId(size.id);
-                setArMode(false);
-                trackEvent("ar_variant_change" as any, {
-                  artId: artwork.id,
-                  sku: size.id,
-                  label: size.label,
-                });
-              }}
-              style={{
-                padding: "10px 10px",
-                borderRadius: 14,
-                border:
-                  size.id === selectedSizeId
-                    ? "2px solid #fff"
-                    : "1px solid #444",
-                backgroundColor:
-                  size.id === selectedSizeId ? "#fff" : "transparent",
-                color: size.id === selectedSizeId ? "#000" : "#fff",
-                cursor: "pointer",
-                fontSize: "0.85rem",
-                fontWeight: 700,
-                textAlign: "center",
-                lineHeight: 1.15,
-                whiteSpace: "normal", // IMPORTANT: allow wrap
-              }}
-            >
-              {size.label}
-            </button>
-          ))}
+          <div style={{ fontWeight: 700, opacity: 0.9 }}>Variants</div>
+          <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>
+            {artwork.sizes.length} options
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 8,
+
+            // key: cap height + allow scroll inside this panel
+            maxHeight: 160,
+            overflowY: "auto",
+            paddingRight: 2,
+          }}
+        >
+          {artwork.sizes.map((size) => {
+            const active = size.id === selectedSizeId;
+            return (
+              <button
+                key={size.id}
+                onClick={() => setSelectedSizeId(size.id)}
+                style={{
+                  padding: "10px 10px",
+                  borderRadius: 999,
+                  border: active ? "2px solid #fff" : "1px solid #444",
+                  backgroundColor: active ? "#fff" : "transparent",
+                  color: active ? "#000" : "#fff",
+                  cursor: "pointer",
+                  fontSize: "0.88rem",
+                  fontWeight: 700,
+                  lineHeight: 1.15,
+                  whiteSpace: "normal",
+                  textAlign: "center",
+                }}
+              >
+                {size.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Start button + texture status */}
-      {!arMode && (
-        <div style={{ width: "100%", maxWidth: 520, textAlign: "center" }}>
-          <button
-            onClick={handleStartPreview}
-            disabled={showPreflight || !textureReady}
-            style={{
-              opacity: showPreflight || !textureReady ? 0.45 : 1,
-              padding: "10px 18px",
-              borderRadius: 12,
-              backgroundColor: "#fff",
-              color: "#000",
-              fontWeight: 800,
-              marginBottom: 8,
-              cursor:
-                showPreflight || !textureReady ? "not-allowed" : "pointer",
-              fontSize: "0.95rem",
-              border: "none",
-              width: "100%",
-            }}
-          >
-            {webxrSupported ? "Start AR Preview" : "Start 3D Preview"}
-          </button>
-
-          {!textureReady && !textureError && (
-            <div style={{ opacity: 0.75, fontSize: "0.85rem" }}>
-              Loading artwork image…
-            </div>
-          )}
-
-          {textureError && (
-            <div style={{ opacity: 0.9, fontSize: "0.85rem" }}>
-              {textureError}
-              <div style={{ opacity: 0.7, marginTop: 4 }}>
-                (Try a different variant or verify the AR image is published in
-                Wix Media.)
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Canvas */}
-      {arMode && (
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 520,
-            height: "44vh",
-            marginTop: 10,
-            marginBottom: 12,
-            borderRadius: 16,
-            overflow: "hidden",
-            border: "1px solid #333",
-            backgroundColor: "#000",
-          }}
-        >
-          <ARCanvas
-            widthMeters={selectedSize.widthMeters}
-            heightMeters={selectedSize.heightMeters}
-            textureUrl={selectedSize.textureUrl}
-            canUseWebXR={webxrSupported}
-            artId={artwork.id}
-            sizeId={selectedSize.id}
-            sizeLabel={selectedSize.label}
-          />
-        </div>
-      )}
-
-      {/* CTAs */}
+      {/* Preview card */}
       <div
         style={{
-          display: "flex",
-          gap: 10,
           width: "100%",
-          maxWidth: 520,
-          marginTop: 6,
+          maxWidth: 560,
+          borderRadius: 22,
+          border: "1px solid #2a2a2a",
+          background: "rgba(0,0,0,0.35)",
+          overflow: "hidden",
+          position: "relative",
+          marginBottom: 12,
         }}
       >
-        <button
-          onClick={() => (window.location.href = selectedSize.pdpUrl)}
-          style={{
-            flex: 1,
-            padding: "10px 14px",
-            borderRadius: "999px",
-            border: "none",
-            backgroundColor: "#fff",
-            color: "#000",
-            cursor: "pointer",
-            fontWeight: 800,
-            fontSize: "0.9rem",
-          }}
-        >
-          View Details
-        </button>
+        {/* Start/Enter button row */}
+        {!arMode && (
+          <div style={{ padding: 12 }}>
+            <button
+              onClick={handleStartPreview}
+              disabled={showPreflight}
+              style={{
+                width: "100%",
+                opacity: showPreflight ? 0.4 : 1,
+                padding: "12px 16px",
+                borderRadius: 14,
+                backgroundColor: "#fff",
+                color: "#000",
+                fontWeight: 800,
+                cursor: showPreflight ? "not-allowed" : "pointer",
+                fontSize: "1rem",
+                border: "none",
+              }}
+            >
+              {webxrSupported ? "Enter AR" : "Start 3D Preview"}
+            </button>
 
-        <button
-          onClick={() => (window.location.href = selectedSize.cartUrl)}
+            <div style={{ marginTop: 8, fontSize: "0.8rem", opacity: 0.6 }}>
+              Selected: {selectedSize.label}
+            </div>
+          </div>
+        )}
+
+        {/* Canvas */}
+        {arMode && (
+          <div
+            style={{
+              width: "100%",
+              height: "min(52vh, 520px)", // bigger preview, still controlled
+              backgroundColor: "#000",
+            }}
+          >
+            <ARCanvas
+              widthMeters={selectedSize.widthMeters}
+              heightMeters={selectedSize.heightMeters}
+              textureUrl={selectedSize.textureUrl}
+              canUseWebXR={webxrSupported}
+              artId={artwork.id}
+              sizeId={selectedSize.id}
+              sizeLabel={selectedSize.label}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Sticky CTA bar */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 2500,
+          padding: "10px 12px",
+          paddingBottom: `calc(10px + env(safe-area-inset-bottom))`,
+          background:
+            "linear-gradient(to top, rgba(17,17,17,0.98), rgba(17,17,17,0.65))",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div
           style={{
-            flex: 1,
-            padding: "10px 14px",
-            borderRadius: "999px",
-            border: "1px solid #fff",
-            backgroundColor: "transparent",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 800,
-            fontSize: "0.9rem",
+            maxWidth: 560,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
           }}
         >
-          Add to Cart
-        </button>
+          <button
+            onClick={() => (window.location.href = selectedSize.pdpUrl)}
+            style={{
+              padding: "14px 14px",
+              borderRadius: 999,
+              border: "none",
+              backgroundColor: "#fff",
+              color: "#000",
+              cursor: "pointer",
+              fontWeight: 900,
+              fontSize: "1rem",
+            }}
+          >
+            View Details
+          </button>
+
+          <button
+            onClick={() => (window.location.href = selectedSize.cartUrl)}
+            style={{
+              padding: "14px 14px",
+              borderRadius: 999,
+              border: "1px solid #fff",
+              backgroundColor: "transparent",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: 900,
+              fontSize: "1rem",
+            }}
+          >
+            Add to Cart
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -561,13 +541,6 @@ function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
   return { wM: wIn * 0.0254, hM: hIn * 0.0254 };
 }
 
-/**
- * Wix media fields can come in a few formats:
- * - "https://static.wixstatic.com/media/...."
- * - "wix:image://v1/<mediaId>/<filename>#..."
- *
- * We MUST convert wix:image://... into a real URL for the AR texture loader.
- */
 function normalizeWixMediaUrl(field: WixMediaField): string {
   const raw =
     typeof field === "string"
@@ -576,21 +549,5 @@ function normalizeWixMediaUrl(field: WixMediaField): string {
 
   if (!raw) return "";
   if (raw.startsWith("http")) return raw;
-
-  // wix:image://v1/<MEDIA_ID>/...
-  if (raw.startsWith("wix:image://v1/")) {
-    const after = raw.replace("wix:image://v1/", "");
-    const mediaId = after.split("/")[0]; // keep ~mv2 if present
-    if (mediaId) return `https://static.wixstatic.com/media/${mediaId}`;
-  }
-
-  // wix:document://v1/<MEDIA_ID>/...
-  if (raw.startsWith("wix:document://v1/")) {
-    const after = raw.replace("wix:document://v1/", "");
-    const mediaId = after.split("/")[0];
-    if (mediaId) return `https://static.wixstatic.com/ugd/${mediaId}`;
-  }
-
-  // fallback (won’t work for textures, but prevents crash)
-  return "";
+  return raw;
 }
