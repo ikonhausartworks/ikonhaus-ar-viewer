@@ -1,6 +1,6 @@
 // src/pages/ARViewer.tsx
 
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { artworks, type Artwork, type ArtworkSize } from "../data/artworks";
 import { trackEvent } from "../utils/analytics";
@@ -10,30 +10,94 @@ import {
   type ARCapabilities,
 } from "../utils/capabilities";
 
+function getQueryParam(search: string, key: string) {
+  const params = new URLSearchParams(search);
+  return params.get(key) || "";
+}
+
 export default function ARViewer() {
   const { artId } = useParams();
+  const location = useLocation();
 
-  const artwork: Artwork | undefined = useMemo(
-    () => artworks.find((a) => a.id === artId),
-    [artId]
+  // ✅ NEW: allow deep-link entry from Wix PDP: /ar?sku=SP-1620-BLK
+  const incomingSku = useMemo(
+    () => getQueryParam(location.search, "sku").trim(),
+    [location.search]
   );
+
+  /**
+   * ✅ Find artwork:
+   * - Priority A: /ar/:artId (existing behavior)
+   * - Priority B: /ar?sku=... (new behavior)
+   */
+  const resolved = useMemo(() => {
+    // A) Existing behavior: artId route param
+    if (artId) {
+      const art = artworks.find((a) => a.id === artId);
+      return { artwork: art, matchedSizeId: art?.defaultSizeId || "" };
+    }
+
+    // B) New behavior: sku-based deep link
+    if (incomingSku) {
+      for (const art of artworks) {
+        // Attempt to match SKU using a dedicated field OR by parsing cartUrl
+        const matched = art.sizes.find((s) => {
+          // If you later add `sku` onto ArtworkSize, this will work immediately:
+          // @ts-ignore
+          const sizeSku = (s as any).sku as string | undefined;
+          if (sizeSku && sizeSku === incomingSku) return true;
+
+          // Fallback: look for sku= in cartUrl (works with your /a2c?sku=... approach)
+          if (typeof s.cartUrl === "string" && s.cartUrl.includes("sku=")) {
+            try {
+              const url = new URL(s.cartUrl);
+              const skuFromUrl = url.searchParams.get("sku");
+              return skuFromUrl === incomingSku;
+            } catch {
+              // If cartUrl isn't an absolute URL, do a simple contains check
+              return s.cartUrl.includes(`sku=${encodeURIComponent(incomingSku)}`);
+            }
+          }
+          return false;
+        });
+
+        if (matched) {
+          return { artwork: art, matchedSizeId: matched.id };
+        }
+      }
+    }
+
+    return { artwork: undefined, matchedSizeId: "" };
+  }, [artId, incomingSku]);
+
+  const artwork: Artwork | undefined = resolved.artwork;
 
   if (!artwork) {
     return (
       <div style={{ padding: 20 }}>
         <h1>IkonHaus AR Viewer</h1>
-        <p>Artwork not found for id: {artId}</p>
+        <p>
+          Artwork not found.
+          {artId ? ` artId=${artId}` : ""}
+          {incomingSku ? ` sku=${incomingSku}` : ""}
+        </p>
       </div>
     );
   }
 
   const [selectedSizeId, setSelectedSizeId] = useState<string>(
-    artwork.defaultSizeId
+    resolved.matchedSizeId || artwork.defaultSizeId
   );
 
   const [arMode, setArMode] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ARCapabilities | null>(null);
   const [showPreflight, setShowPreflight] = useState<boolean>(true);
+
+  // ✅ If SKU changes (or route changes), force-select the matched size
+  useEffect(() => {
+    const next = resolved.matchedSizeId || artwork.defaultSizeId;
+    setSelectedSizeId(next);
+  }, [resolved.matchedSizeId, artwork.defaultSizeId]);
 
   const selectedSize: ArtworkSize =
     artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
@@ -43,6 +107,8 @@ export default function ARViewer() {
     trackEvent("ar_session_start", {
       artId: artwork.id,
       title: artwork.title,
+      entrySku: incomingSku || undefined,
+      entryRoute: artId ? "route_artId" : incomingSku ? "query_sku" : "unknown",
     });
 
     const caps = detectARCapabilities();
@@ -54,34 +120,37 @@ export default function ARViewer() {
       isAndroid: caps.isAndroid,
       webxrSupported: caps.webxrSupported,
     });
-  }, [artwork.id, artwork.title]);
+  }, [artwork.id, artwork.title, incomingSku, artId]);
 
   // Preflight shown (once per mount)
   useEffect(() => {
     trackEvent("ar_preflight_shown" as any, {
       artId: artwork.id,
+      entrySku: incomingSku || undefined,
     });
-  }, [artwork.id]);
+  }, [artwork.id, incomingSku]);
 
   // Session end when viewer unmounts
   useEffect(() => {
     return () => {
       trackEvent("ar_session_end" as any, {
         artId: artwork.id,
+        entrySku: incomingSku || undefined,
       });
     };
-  }, [artwork.id]);
+  }, [artwork.id, incomingSku]);
 
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
   const handleStartPreview = () => {
-    if (showPreflight) return; // still showing instructions
+    if (showPreflight) return;
     setArMode(true);
     trackEvent("ar_preview_started" as any, {
       artId: artwork.id,
       sizeId: selectedSize.id,
       sizeLabel: selectedSize.label,
       webxrSupported,
+      entrySku: incomingSku || undefined,
     });
   };
 
@@ -128,12 +197,7 @@ export default function ARViewer() {
               maxHeight: "calc(100vh - 64px)",
             }}
           >
-            <h2
-              style={{
-                marginBottom: "10px",
-                fontSize: "1.4rem",
-              }}
-            >
+            <h2 style={{ marginBottom: "10px", fontSize: "1.4rem" }}>
               Before You Preview
             </h2>
 
@@ -149,7 +213,6 @@ export default function ARViewer() {
               your wall and hold your phone at a comfortable viewing distance.
             </p>
 
-            {/* Illustration image */}
             <img
               src="https://static.wixstatic.com/media/f656fb_d6a46a4b58434bc19003f5b3b6b18147~mv2.png"
               alt="How to hold your phone before using AR"
@@ -169,6 +232,7 @@ export default function ARViewer() {
                   artId: artwork.id,
                   sizeId: selectedSize.id,
                   sizeLabel: selectedSize.label,
+                  entrySku: incomingSku || undefined,
                 });
                 setShowPreflight(false);
               }}
@@ -190,13 +254,7 @@ export default function ARViewer() {
       )}
 
       {/* Top section */}
-      <h1
-        style={{
-          fontSize: "1.8rem",
-          marginBottom: "3px",
-          textAlign: "center",
-        }}
-      >
+      <h1 style={{ fontSize: "1.8rem", marginBottom: "3px", textAlign: "center" }}>
         {artwork.title}
       </h1>
 
@@ -227,13 +285,7 @@ export default function ARViewer() {
       )}
 
       {/* Size selector */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginBottom: "10px",
-        }}
-      >
+      <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
         {artwork.sizes.map((size) => (
           <button
             key={size.id}
@@ -243,17 +295,15 @@ export default function ARViewer() {
                 artId: artwork.id,
                 newSizeId: size.id,
                 newSizeLabel: size.label,
+                entrySku: incomingSku || undefined,
               });
             }}
             style={{
               padding: "7px 12px",
               borderRadius: "999px",
               border:
-                size.id === selectedSizeId
-                  ? "2px solid #fff"
-                  : "1px solid #555",
-              backgroundColor:
-                size.id === selectedSizeId ? "#fff" : "transparent",
+                size.id === selectedSizeId ? "2px solid #fff" : "1px solid #555",
+              backgroundColor: size.id === selectedSizeId ? "#fff" : "transparent",
               color: size.id === selectedSizeId ? "#000" : "#fff",
               cursor: "pointer",
               fontSize: "0.85rem",
@@ -313,13 +363,7 @@ export default function ARViewer() {
       )}
 
       {/* CTAs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginBottom: "2px",
-        }}
-      >
+      <div style={{ display: "flex", gap: "8px", marginBottom: "2px" }}>
         <button
           onClick={() => {
             trackEvent("ar_cta_click" as any, {
@@ -327,6 +371,7 @@ export default function ARViewer() {
               sizeId: selectedSize.id,
               sizeLabel: selectedSize.label,
               cta: "view_details",
+              entrySku: incomingSku || undefined,
             });
             window.location.href = selectedSize.pdpUrl;
           }}
@@ -351,6 +396,7 @@ export default function ARViewer() {
               sizeId: selectedSize.id,
               sizeLabel: selectedSize.label,
               cta: "add_to_cart",
+              entrySku: incomingSku || undefined,
             });
             window.location.href = selectedSize.cartUrl;
           }}
