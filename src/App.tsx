@@ -26,7 +26,7 @@ function App() {
       </p>
 
       <Link
-        to="/ar/madness-is-genius"
+        to="/ar/marilyn-monroe-madness-is-genius"
         style={{
           padding: "12px 24px",
           borderRadius: "999px",
