@@ -5,21 +5,38 @@ import { trackEvent } from "../utils/analytics";
 import ARCanvas from "../components/ARCanvas";
 import { detectARCapabilities, type ARCapabilities } from "../utils/capabilities";
 
+type WixMediaField =
+  | string
+  | {
+      url?: string;
+      src?: string;
+      fileUrl?: string;
+    }
+  | null
+  | undefined;
+
 type CmsItem = {
   title?: string;
   artworkSlug?: string;
+
   sku: string;
-  sizeCode: string;      // e.g. "16 x 20 inches" or "36 x 24 in"
-  frameColor: string;    // "Black" / "White"
-  orientation: string;   // "PORTRAIT" / "LANDSCAPE"
-  arImageWebp: any;      // Wix media field (object)
+
+  sizeCode: string; // e.g. "16 x 20 in" or "36 x 24 in"
+  frameColor: string; // "Black" / "White"
+  orientation: string; // "PORTRAIT" / "LANDSCAPE"
+
+  arImageWebp: WixMediaField;
+
   pdpUrl?: string;
   addToCartUrl?: string;
+
+  // ✅ This was missing but used in your code
+  sortIndex?: number;
 };
 
 type ArtworkSize = {
-  id: string;            // we’ll use SKU as size id
-  label: string;         // e.g. "Black | 16 x 20 inches"
+  id: string; // SKU
+  label: string;
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
@@ -28,7 +45,7 @@ type ArtworkSize = {
 };
 
 type Artwork = {
-  id: string;            // artworkSlug
+  id: string; // artworkSlug
   title: string;
   defaultSizeId: string; // default SKU
   sizes: ArtworkSize[];
@@ -51,7 +68,7 @@ export default function ARViewer() {
 
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
-  // Session start + capabilities
+  // Capabilities
   useEffect(() => {
     const caps = detectARCapabilities();
     setCapabilities(caps);
@@ -69,34 +86,41 @@ export default function ARViewer() {
         const qs = artId
           ? `?artworkSlug=${encodeURIComponent(artId)}`
           : sku
-            ? `?sku=${encodeURIComponent(sku)}`
-            : "";
+          ? `?sku=${encodeURIComponent(sku)}`
+          : "";
 
         if (!qs) {
-          setLoadError("No artwork selected. Use /ar?sku=YOUR_SKU or /ar/:artworkSlug");
+          setLoadError(
+            "No artwork selected. Use /ar?sku=YOUR_SKU or /ar/:artworkSlug"
+          );
           return;
         }
 
         const res = await fetch(`${WIX_API}${qs}`);
         if (!res.ok) throw new Error(`API failed: ${res.status}`);
 
-        const json = await res.json();
+        const json: any = await res.json();
         const items: CmsItem[] = json?.items || [];
 
         if (!items.length) {
-          setLoadError(`No CMS rows returned for ${artId ? `artworkSlug=${artId}` : `sku=${sku}`}`);
+          setLoadError(
+            `No CMS rows returned for ${
+              artId ? `artworkSlug=${artId}` : `sku=${sku}`
+            }`
+          );
           return;
         }
 
-        // If loaded by SKU, all returned items might be just 1 row.
-        // We want ALL variants for that artworkSlug, so we do a 2nd fetch by slug.
+        // If loaded by SKU, resolve slug then refetch all variants by slug
         const resolvedSlug = items[0]?.artworkSlug || artId || "";
         let fullItems = items;
 
         if (!artId && resolvedSlug) {
-          const res2 = await fetch(`${WIX_API}?artworkSlug=${encodeURIComponent(resolvedSlug)}`);
+          const res2 = await fetch(
+            `${WIX_API}?artworkSlug=${encodeURIComponent(resolvedSlug)}`
+          );
           if (res2.ok) {
-            const json2 = await res2.json();
+            const json2: any = await res2.json();
             fullItems = json2?.items || items;
           }
         }
@@ -112,18 +136,25 @@ export default function ARViewer() {
           artId: built.id,
           title: built.title,
         });
-      } catch (e: any) {
-        if (!cancelled) setLoadError(e?.message || String(e));
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!cancelled) setLoadError(msg);
       }
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [artId, sku]);
 
   const selectedSize = useMemo(() => {
     if (!artwork) return null;
-    return artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0] ?? null;
+    return (
+      artwork.sizes.find((s) => s.id === selectedSizeId) ??
+      artwork.sizes[0] ??
+      null
+    );
   }, [artwork, selectedSizeId]);
 
   const handleStartPreview = () => {
@@ -148,8 +179,12 @@ export default function ARViewer() {
         <p style={{ whiteSpace: "pre-wrap" }}>{loadError}</p>
         <p>Try:</p>
         <ul>
-          <li><code>/ar?sku=SP-1620-BLK</code></li>
-          <li><code>/ar/sami-woman-karasjok-marcus-selmer</code></li>
+          <li>
+            <code>/ar?sku=SP-1620-BLK</code>
+          </li>
+          <li>
+            <code>/ar/spherical-study-unknown</code>
+          </li>
         </ul>
       </div>
     );
@@ -256,7 +291,9 @@ export default function ARViewer() {
       )}
 
       {/* Top */}
-      <h1 style={{ fontSize: "1.8rem", marginBottom: "3px", textAlign: "center" }}>
+      <h1
+        style={{ fontSize: "1.8rem", marginBottom: "3px", textAlign: "center" }}
+      >
         {artwork.title}
       </h1>
 
@@ -273,7 +310,15 @@ export default function ARViewer() {
       </p>
 
       {/* Variant selector */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "10px",
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
         {artwork.sizes.map((size) => (
           <button
             key={size.id}
@@ -281,8 +326,10 @@ export default function ARViewer() {
             style={{
               padding: "7px 12px",
               borderRadius: "999px",
-              border: size.id === selectedSizeId ? "2px solid #fff" : "1px solid #555",
-              backgroundColor: size.id === selectedSizeId ? "#fff" : "transparent",
+              border:
+                size.id === selectedSizeId ? "2px solid #fff" : "1px solid #555",
+              backgroundColor:
+                size.id === selectedSizeId ? "#fff" : "transparent",
               color: size.id === selectedSizeId ? "#000" : "#fff",
               cursor: "pointer",
               fontSize: "0.85rem",
@@ -380,8 +427,9 @@ export default function ARViewer() {
 }
 
 function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
-  // Sort if you want deterministic order
-  const sorted = [...items].sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+  const sorted = [...items].sort(
+    (a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0)
+  );
 
   const first = sorted[0];
   const slug = first.artworkSlug || "unknown-artwork";
@@ -392,7 +440,7 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
     const textureUrl = normalizeWixMediaUrl(x.arImageWebp);
 
     return {
-      id: x.sku, // SKU is the selector id
+      id: x.sku,
       label: `${x.frameColor} | ${x.sizeCode}`,
       widthMeters: wM,
       heightMeters: hM,
@@ -402,48 +450,39 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
     };
   });
 
-  const defaultSizeId = defaultSku && sizes.some((s) => s.id === defaultSku)
-    ? defaultSku
-    : sizes[0]?.id || "";
+  const defaultSizeId =
+    defaultSku && sizes.some((s) => s.id === defaultSku)
+      ? defaultSku
+      : sizes[0]?.id || "";
 
   return { id: slug, title, defaultSizeId, sizes };
 }
 
 function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
-  // accepts: "16 x 20 inches", "19.75 x 27.5 inches", "36 x 24 in"
   const nums = (sizeCode || "").match(/(\d+(\.\d+)?)/g)?.map(Number) || [];
   const a = nums[0] || 0;
   const b = nums[1] || 0;
 
-  // treat "a x b" as width x height by default
   let wIn = a;
   let hIn = b;
 
-  // If PORTRAIT and width > height, swap (safety)
-  if ((orientation || "").toUpperCase() === "PORTRAIT" && wIn > hIn) {
-    [wIn, hIn] = [hIn, wIn];
-  }
-  // If LANDSCAPE and height > width, swap (safety)
-  if ((orientation || "").toUpperCase() === "LANDSCAPE" && hIn > wIn) {
-    [wIn, hIn] = [hIn, wIn];
-  }
+  const o = (orientation || "").toUpperCase();
+  if (o === "PORTRAIT" && wIn > hIn) [wIn, hIn] = [hIn, wIn];
+  if (o === "LANDSCAPE" && hIn > wIn) [wIn, hIn] = [hIn, wIn];
 
-  const wM = wIn * 0.0254;
-  const hM = hIn * 0.0254;
-
-  return { wM, hM };
+  return { wM: wIn * 0.0254, hM: hIn * 0.0254 };
 }
 
-function normalizeWixMediaUrl(arImageWebp: any): string {
-  // Wix media fields can come as objects like { url: "...", ... }
-  const raw = typeof arImageWebp === "string" ? arImageWebp : arImageWebp?.url;
+function normalizeWixMediaUrl(field: WixMediaField): string {
+  const raw =
+    typeof field === "string"
+      ? field
+      : field?.url || field?.src || field?.fileUrl || "";
 
   if (!raw) return "";
-
-  // If Wix gives you a full https url, use it
   if (raw.startsWith("http")) return raw;
 
-  // If it’s a wix:image:// style URL, you can usually still use the direct static form,
-  // but the simplest approach is: store real URLs in CMS media if possible.
+  // If you ever store wix:image://... style values, you’ll want to convert them to static URLs.
+  // For now we return raw to avoid breaking build; best practice is storing full URLs in CMS.
   return raw;
 }
