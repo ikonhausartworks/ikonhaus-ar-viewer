@@ -1,158 +1,168 @@
 // src/pages/ARViewer.tsx
-
 import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { artworks, type Artwork, type ArtworkSize } from "../data/artworks";
 import { trackEvent } from "../utils/analytics";
 import ARCanvas from "../components/ARCanvas";
-import {
-  detectARCapabilities,
-  type ARCapabilities,
-} from "../utils/capabilities";
+import { detectARCapabilities, type ARCapabilities } from "../utils/capabilities";
 
-function getQueryParam(search: string, key: string) {
-  const params = new URLSearchParams(search);
-  return params.get(key) || "";
-}
+type CmsItem = {
+  title?: string;
+  artworkSlug?: string;
+  sku: string;
+  sizeCode: string;      // e.g. "16 x 20 inches" or "36 x 24 in"
+  frameColor: string;    // "Black" / "White"
+  orientation: string;   // "PORTRAIT" / "LANDSCAPE"
+  arImageWebp: any;      // Wix media field (object)
+  pdpUrl?: string;
+  addToCartUrl?: string;
+};
+
+type ArtworkSize = {
+  id: string;            // we’ll use SKU as size id
+  label: string;         // e.g. "Black | 16 x 20 inches"
+  widthMeters: number;
+  heightMeters: number;
+  textureUrl: string;
+  pdpUrl: string;
+  cartUrl: string;
+};
+
+type Artwork = {
+  id: string;            // artworkSlug
+  title: string;
+  defaultSizeId: string; // default SKU
+  sizes: ArtworkSize[];
+};
+
+const WIX_API = "https://www.ikonhausartworks.com/_functions/arGallery";
 
 export default function ARViewer() {
   const { artId } = useParams();
   const location = useLocation();
+  const sku = new URLSearchParams(location.search).get("sku") || "";
 
-  // ✅ NEW: allow deep-link entry from Wix PDP: /ar?sku=SP-1620-BLK
-  const incomingSku = useMemo(
-    () => getQueryParam(location.search, "sku").trim(),
-    [location.search]
-  );
+  const [artwork, setArtwork] = useState<Artwork | null>(null);
+  const [loadError, setLoadError] = useState<string>("");
 
-  /**
-   * ✅ Find artwork:
-   * - Priority A: /ar/:artId (existing behavior)
-   * - Priority B: /ar?sku=... (new behavior)
-   */
-  const resolved = useMemo(() => {
-    // A) Existing behavior: artId route param
-    if (artId) {
-      const art = artworks.find((a) => a.id === artId);
-      return { artwork: art, matchedSizeId: art?.defaultSizeId || "" };
-    }
-
-    // B) New behavior: sku-based deep link
-    if (incomingSku) {
-      for (const art of artworks) {
-        // Attempt to match SKU using a dedicated field OR by parsing cartUrl
-        const matched = art.sizes.find((s) => {
-          // If you later add `sku` onto ArtworkSize, this will work immediately:
-          // @ts-ignore
-          const sizeSku = (s as any).sku as string | undefined;
-          if (sizeSku && sizeSku === incomingSku) return true;
-
-          // Fallback: look for sku= in cartUrl (works with your /a2c?sku=... approach)
-          if (typeof s.cartUrl === "string" && s.cartUrl.includes("sku=")) {
-            try {
-              const url = new URL(s.cartUrl);
-              const skuFromUrl = url.searchParams.get("sku");
-              return skuFromUrl === incomingSku;
-            } catch {
-              // If cartUrl isn't an absolute URL, do a simple contains check
-              return s.cartUrl.includes(`sku=${encodeURIComponent(incomingSku)}`);
-            }
-          }
-          return false;
-        });
-
-        if (matched) {
-          return { artwork: art, matchedSizeId: matched.id };
-        }
-      }
-    }
-
-    return { artwork: undefined, matchedSizeId: "" };
-  }, [artId, incomingSku]);
-
-  const artwork: Artwork | undefined = resolved.artwork;
-
-  if (!artwork) {
-    return (
-      <div style={{ padding: 20 }}>
-        <h1>IkonHaus AR Viewer</h1>
-        <p>
-          Artwork not found.
-          {artId ? ` artId=${artId}` : ""}
-          {incomingSku ? ` sku=${incomingSku}` : ""}
-        </p>
-      </div>
-    );
-  }
-
-  const [selectedSizeId, setSelectedSizeId] = useState<string>(
-    resolved.matchedSizeId || artwork.defaultSizeId
-  );
-
+  const [selectedSizeId, setSelectedSizeId] = useState<string>("");
   const [arMode, setArMode] = useState<boolean>(false);
   const [capabilities, setCapabilities] = useState<ARCapabilities | null>(null);
   const [showPreflight, setShowPreflight] = useState<boolean>(true);
 
-  // ✅ If SKU changes (or route changes), force-select the matched size
-  useEffect(() => {
-    const next = resolved.matchedSizeId || artwork.defaultSizeId;
-    setSelectedSizeId(next);
-  }, [resolved.matchedSizeId, artwork.defaultSizeId]);
-
-  const selectedSize: ArtworkSize =
-    artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0];
+  const webxrSupported = capabilities?.webxrSupported ?? false;
 
   // Session start + capabilities
   useEffect(() => {
-    trackEvent("ar_session_start", {
-      artId: artwork.id,
-      title: artwork.title,
-      entrySku: incomingSku || undefined,
-      entryRoute: artId ? "route_artId" : incomingSku ? "query_sku" : "unknown",
-    });
-
     const caps = detectARCapabilities();
     setCapabilities(caps);
+  }, []);
 
-    trackEvent("ar_capabilities_detected" as any, {
-      artId: artwork.id,
-      isIOS: caps.isIOS,
-      isAndroid: caps.isAndroid,
-      webxrSupported: caps.webxrSupported,
-    });
-  }, [artwork.id, artwork.title, incomingSku, artId]);
-
-  // Preflight shown (once per mount)
+  // Fetch from Wix CMS (by slug or sku)
   useEffect(() => {
-    trackEvent("ar_preflight_shown" as any, {
-      artId: artwork.id,
-      entrySku: incomingSku || undefined,
-    });
-  }, [artwork.id, incomingSku]);
+    let cancelled = false;
 
-  // Session end when viewer unmounts
-  useEffect(() => {
-    return () => {
-      trackEvent("ar_session_end" as any, {
-        artId: artwork.id,
-        entrySku: incomingSku || undefined,
-      });
-    };
-  }, [artwork.id, incomingSku]);
+    async function load() {
+      try {
+        setLoadError("");
+        setArtwork(null);
 
-  const webxrSupported = capabilities?.webxrSupported ?? false;
+        const qs = artId
+          ? `?artworkSlug=${encodeURIComponent(artId)}`
+          : sku
+            ? `?sku=${encodeURIComponent(sku)}`
+            : "";
+
+        if (!qs) {
+          setLoadError("No artwork selected. Use /ar?sku=YOUR_SKU or /ar/:artworkSlug");
+          return;
+        }
+
+        const res = await fetch(`${WIX_API}${qs}`);
+        if (!res.ok) throw new Error(`API failed: ${res.status}`);
+
+        const json = await res.json();
+        const items: CmsItem[] = json?.items || [];
+
+        if (!items.length) {
+          setLoadError(`No CMS rows returned for ${artId ? `artworkSlug=${artId}` : `sku=${sku}`}`);
+          return;
+        }
+
+        // If loaded by SKU, all returned items might be just 1 row.
+        // We want ALL variants for that artworkSlug, so we do a 2nd fetch by slug.
+        const resolvedSlug = items[0]?.artworkSlug || artId || "";
+        let fullItems = items;
+
+        if (!artId && resolvedSlug) {
+          const res2 = await fetch(`${WIX_API}?artworkSlug=${encodeURIComponent(resolvedSlug)}`);
+          if (res2.ok) {
+            const json2 = await res2.json();
+            fullItems = json2?.items || items;
+          }
+        }
+
+        const built = buildArtworkFromCms(fullItems, sku);
+
+        if (!cancelled) {
+          setArtwork(built);
+          setSelectedSizeId(built.defaultSizeId);
+        }
+
+        trackEvent("ar_session_start", {
+          artId: built.id,
+          title: built.title,
+        });
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || String(e));
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [artId, sku]);
+
+  const selectedSize = useMemo(() => {
+    if (!artwork) return null;
+    return artwork.sizes.find((s) => s.id === selectedSizeId) ?? artwork.sizes[0] ?? null;
+  }, [artwork, selectedSizeId]);
 
   const handleStartPreview = () => {
     if (showPreflight) return;
     setArMode(true);
-    trackEvent("ar_preview_started" as any, {
-      artId: artwork.id,
-      sizeId: selectedSize.id,
-      sizeLabel: selectedSize.label,
-      webxrSupported,
-      entrySku: incomingSku || undefined,
-    });
+
+    if (artwork && selectedSize) {
+      trackEvent("ar_preview_started" as any, {
+        artId: artwork.id,
+        sizeId: selectedSize.id,
+        sizeLabel: selectedSize.label,
+        webxrSupported,
+      });
+    }
   };
+
+  // Loading / error
+  if (loadError) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>IkonHaus AR Viewer</h1>
+        <p style={{ whiteSpace: "pre-wrap" }}>{loadError}</p>
+        <p>Try:</p>
+        <ul>
+          <li><code>/ar?sku=SP-1620-BLK</code></li>
+          <li><code>/ar/sami-woman-karasjok-marcus-selmer</code></li>
+        </ul>
+      </div>
+    );
+  }
+
+  if (!artwork || !selectedSize) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>IkonHaus AR Viewer</h1>
+        <p>Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -166,7 +176,7 @@ export default function ARViewer() {
         alignItems: "center",
       }}
     >
-      {/* 🔥 PREFLIGHT MODAL */}
+      {/* PREFLIGHT */}
       {showPreflight && (
         <div
           style={{
@@ -227,15 +237,7 @@ export default function ARViewer() {
             />
 
             <button
-              onClick={() => {
-                trackEvent("ar_preflight_dismissed" as any, {
-                  artId: artwork.id,
-                  sizeId: selectedSize.id,
-                  sizeLabel: selectedSize.label,
-                  entrySku: incomingSku || undefined,
-                });
-                setShowPreflight(false);
-              }}
+              onClick={() => setShowPreflight(false)}
               style={{
                 padding: "10px 20px",
                 borderRadius: "10px",
@@ -253,7 +255,7 @@ export default function ARViewer() {
         </div>
       )}
 
-      {/* Top section */}
+      {/* Top */}
       <h1 style={{ fontSize: "1.8rem", marginBottom: "3px", textAlign: "center" }}>
         {artwork.title}
       </h1>
@@ -267,42 +269,19 @@ export default function ARViewer() {
           lineHeight: 1.3,
         }}
       >
-        Choose your artwork size and then preview this piece at true scale in AR.
+        Choose your variant and preview this piece at true scale.
       </p>
 
-      {capabilities && !webxrSupported && (
-        <p
-          style={{
-            marginBottom: "6px",
-            fontSize: "0.8rem",
-            opacity: 0.7,
-            textAlign: "center",
-          }}
-        >
-          AR view isn&apos;t available on this device yet, but you can still see
-          a true-to-scale 3D preview.
-        </p>
-      )}
-
-      {/* Size selector */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+      {/* Variant selector */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "10px", flexWrap: "wrap", justifyContent: "center" }}>
         {artwork.sizes.map((size) => (
           <button
             key={size.id}
-            onClick={() => {
-              setSelectedSizeId(size.id);
-              trackEvent("ar_size_change" as any, {
-                artId: artwork.id,
-                newSizeId: size.id,
-                newSizeLabel: size.label,
-                entrySku: incomingSku || undefined,
-              });
-            }}
+            onClick={() => setSelectedSizeId(size.id)}
             style={{
               padding: "7px 12px",
               borderRadius: "999px",
-              border:
-                size.id === selectedSizeId ? "2px solid #fff" : "1px solid #555",
+              border: size.id === selectedSizeId ? "2px solid #fff" : "1px solid #555",
               backgroundColor: size.id === selectedSizeId ? "#fff" : "transparent",
               color: size.id === selectedSizeId ? "#000" : "#fff",
               cursor: "pointer",
@@ -315,7 +294,7 @@ export default function ARViewer() {
         ))}
       </div>
 
-      {/* AR / 3D preview entry button */}
+      {/* Start button */}
       {!arMode && (
         <button
           onClick={handleStartPreview}
@@ -336,7 +315,7 @@ export default function ARViewer() {
         </button>
       )}
 
-      {/* AR preview container */}
+      {/* Canvas */}
       {arMode && (
         <div
           style={{
@@ -365,16 +344,7 @@ export default function ARViewer() {
       {/* CTAs */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "2px" }}>
         <button
-          onClick={() => {
-            trackEvent("ar_cta_click" as any, {
-              artId: artwork.id,
-              sizeId: selectedSize.id,
-              sizeLabel: selectedSize.label,
-              cta: "view_details",
-              entrySku: incomingSku || undefined,
-            });
-            window.location.href = selectedSize.pdpUrl;
-          }}
+          onClick={() => (window.location.href = selectedSize.pdpUrl)}
           style={{
             padding: "8px 16px",
             borderRadius: "999px",
@@ -390,16 +360,7 @@ export default function ARViewer() {
         </button>
 
         <button
-          onClick={() => {
-            trackEvent("ar_cta_click" as any, {
-              artId: artwork.id,
-              sizeId: selectedSize.id,
-              sizeLabel: selectedSize.label,
-              cta: "add_to_cart",
-              entrySku: incomingSku || undefined,
-            });
-            window.location.href = selectedSize.cartUrl;
-          }}
+          onClick={() => (window.location.href = selectedSize.cartUrl)}
           style={{
             padding: "8px 16px",
             borderRadius: "999px",
@@ -414,21 +375,75 @@ export default function ARViewer() {
           Add to Cart
         </button>
       </div>
-
-      <p
-        style={{
-          marginTop: "2px",
-          fontSize: "0.78rem",
-          opacity: 0.6,
-          textAlign: "center",
-          lineHeight: 1.25,
-        }}
-      >
-        Selected size: {selectedSize.label}
-        <br />
-        For the most accurate AR sizing, stand about 2m from your wall and hold
-        your phone in front of you before pressing Enter AR.
-      </p>
     </div>
   );
+}
+
+function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
+  // Sort if you want deterministic order
+  const sorted = [...items].sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+
+  const first = sorted[0];
+  const slug = first.artworkSlug || "unknown-artwork";
+  const title = first.title || slug;
+
+  const sizes: ArtworkSize[] = sorted.map((x) => {
+    const { wM, hM } = inchesToMetersFromSizeCode(x.sizeCode, x.orientation);
+    const textureUrl = normalizeWixMediaUrl(x.arImageWebp);
+
+    return {
+      id: x.sku, // SKU is the selector id
+      label: `${x.frameColor} | ${x.sizeCode}`,
+      widthMeters: wM,
+      heightMeters: hM,
+      textureUrl,
+      pdpUrl: x.pdpUrl || "https://www.ikonhausartworks.com",
+      cartUrl: x.addToCartUrl || "https://www.ikonhausartworks.com/cart-page",
+    };
+  });
+
+  const defaultSizeId = defaultSku && sizes.some((s) => s.id === defaultSku)
+    ? defaultSku
+    : sizes[0]?.id || "";
+
+  return { id: slug, title, defaultSizeId, sizes };
+}
+
+function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
+  // accepts: "16 x 20 inches", "19.75 x 27.5 inches", "36 x 24 in"
+  const nums = (sizeCode || "").match(/(\d+(\.\d+)?)/g)?.map(Number) || [];
+  const a = nums[0] || 0;
+  const b = nums[1] || 0;
+
+  // treat "a x b" as width x height by default
+  let wIn = a;
+  let hIn = b;
+
+  // If PORTRAIT and width > height, swap (safety)
+  if ((orientation || "").toUpperCase() === "PORTRAIT" && wIn > hIn) {
+    [wIn, hIn] = [hIn, wIn];
+  }
+  // If LANDSCAPE and height > width, swap (safety)
+  if ((orientation || "").toUpperCase() === "LANDSCAPE" && hIn > wIn) {
+    [wIn, hIn] = [hIn, wIn];
+  }
+
+  const wM = wIn * 0.0254;
+  const hM = hIn * 0.0254;
+
+  return { wM, hM };
+}
+
+function normalizeWixMediaUrl(arImageWebp: any): string {
+  // Wix media fields can come as objects like { url: "...", ... }
+  const raw = typeof arImageWebp === "string" ? arImageWebp : arImageWebp?.url;
+
+  if (!raw) return "";
+
+  // If Wix gives you a full https url, use it
+  if (raw.startsWith("http")) return raw;
+
+  // If it’s a wix:image:// style URL, you can usually still use the direct static form,
+  // but the simplest approach is: store real URLs in CMS media if possible.
+  return raw;
 }
