@@ -41,10 +41,7 @@ export default function ARCanvas({
       sizeLabel,
     });
 
-    // Existing behavior: show hint after AR entry
     setShowHint(true);
-
-    // UX only: show tracking help briefly
     setShowTrackingHelp(true);
 
     xrStore.enterAR();
@@ -86,7 +83,7 @@ export default function ARCanvas({
         </div>
       )}
 
-      {/* Center reticle + Enter AR button behind it (tappable) */}
+      {/* Center reticle (clickable) + label underneath */}
       {canUseWebXR && (
         <div
           style={{
@@ -99,74 +96,90 @@ export default function ARCanvas({
             pointerEvents: "none",
           }}
         >
-          <div style={{ position: "relative", width: 120, height: 120 }}>
-            {/* Click target: button sits behind the reticle */}
-            <button
-              type="button"
-              onClick={handleEnterAR}
-              style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: 999,
-                border: "none",
-                backgroundColor: "rgba(255,255,255,0.92)",
-                color: "#000",
-                fontWeight: 900,
-                cursor: "pointer",
-                pointerEvents: "auto",
-                boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 4,
-              }}
-              aria-label="Enter AR"
-            >
-              <div style={{ fontSize: 14, letterSpacing: 0.2 }}>Enter AR</div>
-              <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.75 }}>
-                Tap the reticle
-              </div>
-            </button>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            {/* Reticle container */}
+            <div style={{ position: "relative", width: 54, height: 54 }}>
+              {/* Click target: invisible button ON the reticle */}
+              <button
+                type="button"
+                onClick={handleEnterAR}
+                aria-label="Enter AR"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 999,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  pointerEvents: "auto",
+                  // subtle shadow ring so it reads as tappable without looking like a big white disc
+                  boxShadow: "0 0 0 3px rgba(0,0,0,0.25)",
+                }}
+              />
 
-            {/* Reticle drawn on top (still center) */}
+              {/* Reticle visual */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 999,
+                  border: "2px solid rgba(255,255,255,0.7)",
+                  boxShadow: "0 0 0 3px rgba(0,0,0,0.25)",
+                  pointerEvents: "none",
+                }}
+                aria-hidden="true"
+              >
+                {/* crosshair */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: 7,
+                    bottom: 7,
+                    width: 2,
+                    transform: "translateX(-50%)",
+                    background: "rgba(255,255,255,0.7)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 7,
+                    right: 7,
+                    height: 2,
+                    transform: "translateY(-50%)",
+                    background: "rgba(255,255,255,0.7)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Label under reticle */}
             <div
               style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                width: 44,
-                height: 44,
+                backgroundColor: "rgba(0,0,0,0.62)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                color: "#fff",
+                padding: "8px 12px",
                 borderRadius: 999,
-                border: "2px solid rgba(0,0,0,0.55)",
-                boxShadow: "0 0 0 3px rgba(255,255,255,0.35)",
+                fontSize: 13,
+                fontWeight: 850,
+                letterSpacing: 0.2,
+                lineHeight: 1,
                 pointerEvents: "none",
+                boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
               }}
               aria-hidden="true"
             >
-              <div
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  top: 7,
-                  bottom: 7,
-                  width: 2,
-                  transform: "translateX(-50%)",
-                  background: "rgba(0,0,0,0.55)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: 7,
-                  right: 7,
-                  height: 2,
-                  transform: "translateY(-50%)",
-                  background: "rgba(0,0,0,0.55)",
-                }}
-              />
+              Tap reticle to enter AR
             </div>
           </div>
         </div>
