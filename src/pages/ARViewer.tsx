@@ -23,12 +23,9 @@ type CmsItem = {
 
   arImageWebp: WixMediaField;
 
-  // ✅ Coming from your arGallery function now:
+  // Returned by your Wix function
   productSlug?: string;
   productPageUrl?: string;
-
-  // ✅ Keep this for variant-specific Add-to-Cart (a2c link)
-  addToCartUrl?: string;
 
   sortIndex?: number;
 };
@@ -39,25 +36,21 @@ type ArtworkSize = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
-
-  // Product-level PDP (same for all variants)
-  pdpUrl: string;
-
-  // Variant-specific a2c link
-  cartUrl: string;
 };
 
 type Artwork = {
   id: string; // artworkSlug
   title: string;
   defaultSizeId: string; // default SKU
-  pdpUrl: string; // product-level PDP
+  pdpUrl: string; // product-level PDP url
   sizes: ArtworkSize[];
 };
 
-const WIX_API = "https://www.ikonhausartworks.com/_functions/arGallery";
 const SITE_BASE = "https://www.ikonhausartworks.com";
-const CART_FALLBACK = `${SITE_BASE}/cart-page`;
+const WIX_API = `${SITE_BASE}/_functions/arGallery`;
+
+// LOCKED: Add-to-cart MUST go through the Wix /a2c page (working plumbing)
+const A2C_BASE = `${SITE_BASE}/a2c`;
 
 export default function ARViewer() {
   const { artId } = useParams();
@@ -168,7 +161,7 @@ export default function ARViewer() {
     );
   }, [artwork, selectedSizeId]);
 
-  // Preload the selected texture before allowing AR
+  // Preload selected texture
   useEffect(() => {
     setTextureReady(false);
     setTextureError("");
@@ -193,7 +186,6 @@ export default function ARViewer() {
   const handleStartPreview = () => {
     if (showPreflight) return;
 
-    // Don’t enter AR if texture isn’t ready
     if (!textureReady) {
       trackEvent("ar_preview_blocked_texture_not_ready" as any, {
         artId: artwork?.id,
@@ -241,6 +233,8 @@ export default function ARViewer() {
       </div>
     );
   }
+
+  const addToCartHref = `${A2C_BASE}?sku=${encodeURIComponent(selectedSize.id)}`;
 
   return (
     <div
@@ -343,7 +337,6 @@ export default function ARViewer() {
           flexDirection: "column",
         }}
       >
-        {/* Title */}
         <h1
           style={{
             fontSize: "1.55rem",
@@ -455,10 +448,6 @@ export default function ARViewer() {
             {textureError && (
               <div style={{ opacity: 0.9, fontSize: "0.85rem", marginTop: 8 }}>
                 {textureError}
-                <div style={{ opacity: 0.7, marginTop: 4 }}>
-                  (Try a different variant or verify the AR image is published in
-                  Wix Media.)
-                </div>
               </div>
             )}
           </div>
@@ -510,7 +499,7 @@ export default function ARViewer() {
           </button>
 
           <button
-            onClick={() => (window.location.href = selectedSize.cartUrl)}
+            onClick={() => (window.location.href = addToCartHref)}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -542,7 +531,7 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
   const slug = first.artworkSlug || "unknown-artwork";
   const title = first.title || slug;
 
-  // ✅ Product-level PDP derived from your API output
+  // PDP must be product-level; prefer productPageUrl from Wix function
   const pdpUrl =
     first.productPageUrl ||
     (first.productSlug ? `${SITE_BASE}/product-page/${first.productSlug}` : "") ||
@@ -558,12 +547,6 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
       widthMeters: wM,
       heightMeters: hM,
       textureUrl,
-
-      // ✅ same PDP across all variants
-      pdpUrl,
-
-      // ✅ variant-specific a2c URL (this is your win)
-      cartUrl: x.addToCartUrl || CART_FALLBACK,
     };
   });
 
@@ -590,9 +573,6 @@ function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
   return { wM: wIn * 0.0254, hM: hIn * 0.0254 };
 }
 
-/**
- * Convert wix:image://... into a real URL for textures.
- */
 function normalizeWixMediaUrl(field: WixMediaField): string {
   const raw =
     typeof field === "string"
