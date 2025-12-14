@@ -11,20 +11,38 @@ type WixMediaField =
   | null
   | undefined;
 
+// We’ll support both the old API shape (pdpUrl/addToCartUrl) AND the new preferred shape
+// where the API includes storeProduct with a slug.
+type StoreProductRef =
+  | string
+  | {
+      _id?: string;
+      id?: string;
+      slug?: string;
+      // Wix sometimes nests slug under "product" or similar – we’ll be defensive
+      productSlug?: string;
+    }
+  | null
+  | undefined;
+
 type CmsItem = {
   title?: string;
   artworkSlug?: string;
 
   sku: string;
 
-  sizeCode: string; // "16 x 20 inches"
+  sizeCode: string; // "16 x 20 in"
   frameColor: string; // "Black" / "White"
   orientation: string; // "PORTRAIT" / "LANDSCAPE"
 
   arImageWebp: WixMediaField;
 
+  // Legacy fields (we will NOT rely on these anymore, but keep as fallback)
   pdpUrl?: string;
   addToCartUrl?: string;
+
+  // ✅ NEW preferred field coming from your API (via include("storeProduct"))
+  storeProduct?: StoreProductRef;
 
   sortIndex?: number;
 };
@@ -35,7 +53,11 @@ type ArtworkSize = {
   widthMeters: number;
   heightMeters: number;
   textureUrl: string;
+
+  // Product-level page (same for all variants of this artwork)
   pdpUrl: string;
+
+  // Variant-specific add-to-cart via /a2c?sku=...
   cartUrl: string;
 };
 
@@ -47,6 +69,9 @@ type Artwork = {
 };
 
 const WIX_API = "https://www.ikonhausartworks.com/_functions/arGallery";
+const SITE_BASE = "https://www.ikonhausartworks.com";
+const PDP_PATH_PREFIX = "/product-page/";
+const A2C_PATH = "/a2c"; // your working A2C page
 
 export default function ARViewer() {
   const { artId } = useParams();
@@ -182,7 +207,6 @@ export default function ARViewer() {
   const handleStartPreview = () => {
     if (showPreflight) return;
 
-    // Don’t enter AR if texture isn’t ready (unchanged)
     if (!textureReady) {
       trackEvent("ar_preview_blocked_texture_not_ready" as any, {
         artId: artwork?.id,
@@ -234,7 +258,6 @@ export default function ARViewer() {
   return (
     <div
       style={{
-        // ✅ Better mobile viewport handling than 100vh (prevents “need to zoom out”)
         minHeight: "100dvh",
         backgroundColor: "#111",
         color: "#fff",
@@ -242,7 +265,6 @@ export default function ARViewer() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        // ✅ Allow normal scroll instead of forcing zoom
         overflowX: "hidden",
       }}
     >
@@ -325,8 +347,15 @@ export default function ARViewer() {
         </div>
       )}
 
-      {/* ✅ CONTENT WRAPPER: keeps everything inside a sane width and avoids zoom-out */}
-      <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column" }}>
+      {/* CONTENT WRAPPER */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {/* Title */}
         <h1
           style={{
@@ -351,7 +380,7 @@ export default function ARViewer() {
           Choose your variant and preview this piece at true scale.
         </p>
 
-        {/* Variant selector (scrollable, tighter) */}
+        {/* Variant selector */}
         <div
           style={{
             border: "1px solid #2a2a2a",
@@ -363,7 +392,6 @@ export default function ARViewer() {
         >
           <div
             style={{
-              // ✅ smaller + responsive-ish; stops the selector from eating the screen
               maxHeight: "22dvh",
               minHeight: 92,
               overflowY: "auto",
@@ -453,7 +481,6 @@ export default function ARViewer() {
         {arMode && (
           <div
             style={{
-              // ✅ keep the preview visible without forcing zoom-out
               height: "38dvh",
               minHeight: 240,
               borderRadius: 16,
@@ -464,7 +491,6 @@ export default function ARViewer() {
             }}
           >
             <ARCanvas
-              // ✅ tiny stability improvement: fresh mount when entering AR or switching variants
               key={`arcanvas-${selectedSize.id}-${webxrSupported ? "xr" : "3d"}`}
               widthMeters={selectedSize.widthMeters}
               heightMeters={selectedSize.heightMeters}
@@ -477,16 +503,19 @@ export default function ARViewer() {
           </div>
         )}
 
-        {/* CTAs (sticky-ish footer feel without messing with plumbing) */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            marginTop: 4,
-          }}
-        >
+        {/* ✅ CTAs: PDP = product-level, A2C = variant-specific */}
+        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
           <button
-            onClick={() => (window.location.href = selectedSize.pdpUrl)}
+            onClick={() => {
+              trackEvent("ar_cta_click" as any, {
+                artId: artwork.id,
+                sizeId: selectedSize.id,
+                sizeLabel: selectedSize.label,
+                cta: "view_details",
+                url: selectedSize.pdpUrl,
+              });
+              window.location.href = selectedSize.pdpUrl;
+            }}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -503,7 +532,16 @@ export default function ARViewer() {
           </button>
 
           <button
-            onClick={() => (window.location.href = selectedSize.cartUrl)}
+            onClick={() => {
+              trackEvent("ar_cta_click" as any, {
+                artId: artwork.id,
+                sizeId: selectedSize.id,
+                sizeLabel: selectedSize.label,
+                cta: "add_to_cart",
+                url: selectedSize.cartUrl,
+              });
+              window.location.href = selectedSize.cartUrl;
+            }}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -520,7 +558,6 @@ export default function ARViewer() {
           </button>
         </div>
 
-        {/* small spacer so mobile browser UI doesn’t crowd CTAs */}
         <div style={{ height: 10 }} />
       </div>
     </div>
@@ -536,9 +573,21 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
   const slug = first.artworkSlug || "unknown-artwork";
   const title = first.title || slug;
 
+  // ✅ Product-level PDP URL: prefer storeProduct.slug if present.
+  // Fallback: first.pdpUrl if your API still returns it.
+  // Final fallback: homepage.
+  const productSlug = extractProductSlug(first.storeProduct);
+  const productPdpUrl =
+    productSlug && productSlug.trim().length > 0
+      ? `${SITE_BASE}${PDP_PATH_PREFIX}${encodeURIComponent(productSlug)}`
+      : first.pdpUrl || SITE_BASE;
+
   const sizes: ArtworkSize[] = sorted.map((x) => {
     const { wM, hM } = inchesToMetersFromSizeCode(x.sizeCode, x.orientation);
     const textureUrl = normalizeWixMediaUrl(x.arImageWebp);
+
+    // ✅ Variant-specific A2C URL computed from SKU (this is the win)
+    const cartUrl = `${SITE_BASE}${A2C_PATH}?sku=${encodeURIComponent(x.sku)}`;
 
     return {
       id: x.sku,
@@ -546,8 +595,8 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
       widthMeters: wM,
       heightMeters: hM,
       textureUrl,
-      pdpUrl: x.pdpUrl || "https://www.ikonhausartworks.com",
-      cartUrl: x.addToCartUrl || "https://www.ikonhausartworks.com/cart-page",
+      pdpUrl: productPdpUrl,
+      cartUrl,
     };
   });
 
@@ -557,6 +606,15 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
       : sizes[0]?.id || "";
 
   return { id: slug, title, defaultSizeId, sizes };
+}
+
+function extractProductSlug(storeProduct: StoreProductRef): string {
+  if (!storeProduct) return "";
+  if (typeof storeProduct === "string") {
+    // If API returns only an ID string, we can't derive a slug here.
+    return "";
+  }
+  return storeProduct.slug || storeProduct.productSlug || "";
 }
 
 function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
