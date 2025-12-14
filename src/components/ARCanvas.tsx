@@ -76,3 +76,18 @@ export default function ARCanvas({
             zIndex: 10,
             padding: "6px 12px",
             borderRadius: 999,
+            border: "1px solid #666",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            color: "#fff",
+            fontSize: 12,
+          }}
+        >
+          3D preview only on this device
+        </div>
+      )}
+
+      {/* Center reticle + Enter AR button behind it (tappable) */}
+      {canUseWebXR && (
+        <div
+          style={{
+            position: "absolute",
