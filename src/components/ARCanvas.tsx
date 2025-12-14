@@ -50,7 +50,7 @@ export default function ARCanvas({
   // Auto-dismiss tracking help after a few seconds (UX only)
   useEffect(() => {
     if (!showTrackingHelp) return;
-    const t = window.setTimeout(() => setShowTrackingHelp(false), 9000);
+    const t = window.setTimeout(() => setShowTrackingHelp(false), 15000);
     return () => window.clearTimeout(t);
   }, [showTrackingHelp]);
 
