@@ -11,38 +11,24 @@ type WixMediaField =
   | null
   | undefined;
 
-// We’ll support both the old API shape (pdpUrl/addToCartUrl) AND the new preferred shape
-// where the API includes storeProduct with a slug.
-type StoreProductRef =
-  | string
-  | {
-      _id?: string;
-      id?: string;
-      slug?: string;
-      // Wix sometimes nests slug under "product" or similar – we’ll be defensive
-      productSlug?: string;
-    }
-  | null
-  | undefined;
-
 type CmsItem = {
   title?: string;
   artworkSlug?: string;
 
   sku: string;
 
-  sizeCode: string; // "16 x 20 in"
+  sizeCode: string; // "16 x 20 inches"
   frameColor: string; // "Black" / "White"
   orientation: string; // "PORTRAIT" / "LANDSCAPE"
 
   arImageWebp: WixMediaField;
 
-  // Legacy fields (we will NOT rely on these anymore, but keep as fallback)
-  pdpUrl?: string;
-  addToCartUrl?: string;
+  // ✅ Coming from your arGallery function now:
+  productSlug?: string;
+  productPageUrl?: string;
 
-  // ✅ NEW preferred field coming from your API (via include("storeProduct"))
-  storeProduct?: StoreProductRef;
+  // ✅ Keep this for variant-specific Add-to-Cart (a2c link)
+  addToCartUrl?: string;
 
   sortIndex?: number;
 };
@@ -54,10 +40,10 @@ type ArtworkSize = {
   heightMeters: number;
   textureUrl: string;
 
-  // Product-level page (same for all variants of this artwork)
+  // Product-level PDP (same for all variants)
   pdpUrl: string;
 
-  // Variant-specific add-to-cart via /a2c?sku=...
+  // Variant-specific a2c link
   cartUrl: string;
 };
 
@@ -65,13 +51,13 @@ type Artwork = {
   id: string; // artworkSlug
   title: string;
   defaultSizeId: string; // default SKU
+  pdpUrl: string; // product-level PDP
   sizes: ArtworkSize[];
 };
 
 const WIX_API = "https://www.ikonhausartworks.com/_functions/arGallery";
 const SITE_BASE = "https://www.ikonhausartworks.com";
-const PDP_PATH_PREFIX = "/product-page/";
-const A2C_PATH = "/a2c"; // your working A2C page
+const CART_FALLBACK = `${SITE_BASE}/cart-page`;
 
 export default function ARViewer() {
   const { artId } = useParams();
@@ -92,13 +78,13 @@ export default function ARViewer() {
 
   const webxrSupported = capabilities?.webxrSupported ?? false;
 
-  // Capabilities (unchanged)
+  // Capabilities
   useEffect(() => {
     const caps = detectARCapabilities();
     setCapabilities(caps);
   }, []);
 
-  // Fetch from Wix CMS (by slug or sku) (unchanged)
+  // Fetch from Wix CMS (by slug or sku)
   useEffect(() => {
     let cancelled = false;
 
@@ -136,7 +122,7 @@ export default function ARViewer() {
           return;
         }
 
-        // If loaded by SKU, resolve slug then refetch all variants by slug (unchanged)
+        // If loaded by SKU, resolve slug then refetch all variants by slug
         const resolvedSlug = items[0]?.artworkSlug || artId || "";
         let fullItems = items;
 
@@ -182,7 +168,7 @@ export default function ARViewer() {
     );
   }, [artwork, selectedSizeId]);
 
-  // Preload the selected texture before allowing AR (unchanged)
+  // Preload the selected texture before allowing AR
   useEffect(() => {
     setTextureReady(false);
     setTextureError("");
@@ -207,6 +193,7 @@ export default function ARViewer() {
   const handleStartPreview = () => {
     if (showPreflight) return;
 
+    // Don’t enter AR if texture isn’t ready
     if (!textureReady) {
       trackEvent("ar_preview_blocked_texture_not_ready" as any, {
         artId: artwork?.id,
@@ -227,7 +214,7 @@ export default function ARViewer() {
     }
   };
 
-  // Loading / error (unchanged)
+  // Loading / error
   if (loadError) {
     return (
       <div style={{ padding: 20 }}>
@@ -268,7 +255,7 @@ export default function ARViewer() {
         overflowX: "hidden",
       }}
     >
-      {/* PREFLIGHT (unchanged) */}
+      {/* PREFLIGHT */}
       {showPreflight && (
         <div
           style={{
@@ -503,19 +490,10 @@ export default function ARViewer() {
           </div>
         )}
 
-        {/* ✅ CTAs: PDP = product-level, A2C = variant-specific */}
+        {/* CTAs */}
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
           <button
-            onClick={() => {
-              trackEvent("ar_cta_click" as any, {
-                artId: artwork.id,
-                sizeId: selectedSize.id,
-                sizeLabel: selectedSize.label,
-                cta: "view_details",
-                url: selectedSize.pdpUrl,
-              });
-              window.location.href = selectedSize.pdpUrl;
-            }}
+            onClick={() => (window.location.href = artwork.pdpUrl)}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -532,16 +510,7 @@ export default function ARViewer() {
           </button>
 
           <button
-            onClick={() => {
-              trackEvent("ar_cta_click" as any, {
-                artId: artwork.id,
-                sizeId: selectedSize.id,
-                sizeLabel: selectedSize.label,
-                cta: "add_to_cart",
-                url: selectedSize.cartUrl,
-              });
-              window.location.href = selectedSize.cartUrl;
-            }}
+            onClick={() => (window.location.href = selectedSize.cartUrl)}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -573,21 +542,15 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
   const slug = first.artworkSlug || "unknown-artwork";
   const title = first.title || slug;
 
-  // ✅ Product-level PDP URL: prefer storeProduct.slug if present.
-  // Fallback: first.pdpUrl if your API still returns it.
-  // Final fallback: homepage.
-  const productSlug = extractProductSlug(first.storeProduct);
-  const productPdpUrl =
-    productSlug && productSlug.trim().length > 0
-      ? `${SITE_BASE}${PDP_PATH_PREFIX}${encodeURIComponent(productSlug)}`
-      : first.pdpUrl || SITE_BASE;
+  // ✅ Product-level PDP derived from your API output
+  const pdpUrl =
+    first.productPageUrl ||
+    (first.productSlug ? `${SITE_BASE}/product-page/${first.productSlug}` : "") ||
+    SITE_BASE;
 
   const sizes: ArtworkSize[] = sorted.map((x) => {
     const { wM, hM } = inchesToMetersFromSizeCode(x.sizeCode, x.orientation);
     const textureUrl = normalizeWixMediaUrl(x.arImageWebp);
-
-    // ✅ Variant-specific A2C URL computed from SKU (this is the win)
-    const cartUrl = `${SITE_BASE}${A2C_PATH}?sku=${encodeURIComponent(x.sku)}`;
 
     return {
       id: x.sku,
@@ -595,8 +558,12 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
       widthMeters: wM,
       heightMeters: hM,
       textureUrl,
-      pdpUrl: productPdpUrl,
-      cartUrl,
+
+      // ✅ same PDP across all variants
+      pdpUrl,
+
+      // ✅ variant-specific a2c URL (this is your win)
+      cartUrl: x.addToCartUrl || CART_FALLBACK,
     };
   });
 
@@ -605,16 +572,7 @@ function buildArtworkFromCms(items: CmsItem[], defaultSku: string): Artwork {
       ? defaultSku
       : sizes[0]?.id || "";
 
-  return { id: slug, title, defaultSizeId, sizes };
-}
-
-function extractProductSlug(storeProduct: StoreProductRef): string {
-  if (!storeProduct) return "";
-  if (typeof storeProduct === "string") {
-    // If API returns only an ID string, we can't derive a slug here.
-    return "";
-  }
-  return storeProduct.slug || storeProduct.productSlug || "";
+  return { id: slug, title, defaultSizeId, pdpUrl, sizes };
 }
 
 function inchesToMetersFromSizeCode(sizeCode: string, orientation: string) {
