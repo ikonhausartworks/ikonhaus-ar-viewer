@@ -357,7 +357,7 @@ export default function ARViewer() {
             lineHeight: 1.3,
           }}
         >
-          Choose your variant and preview this piece at true scale.
+          Choose your frame color and size to preview this piece at true scale.
         </p>
 
         {/* Variant selector */}
